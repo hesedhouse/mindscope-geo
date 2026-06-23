@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindScope GEO -- Login</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --ink: #0B0F19;
+            --ink-light: #141924;
+            --ink-card: #1A2030;
+            --lime: #C6FF3D;
+            --lime-dim: rgba(198,255,61,0.15);
+            --text: #FAFBFC;
+            --fog: #A0AEC0;
+            --border: rgba(255,255,255,0.08);
+            --danger: #FF2D5F;
+            --radius: 16px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--ink);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* Background glow */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -200px;
+            right: -200px;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(198,255,61,0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: var(--lime);
+            color: var(--ink);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 1.2rem;
+        }
+
+        .logo-text {
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .logo-text span {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 400;
+            color: var(--fog);
+            letter-spacing: 0.04em;
+        }
+
+        .card {
+            background: var(--ink-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 28px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px 0;
+            text-align: center;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--fog);
+            background: none;
+            border: none;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover { color: var(--text); }
+
+        .tab.active {
+            color: var(--lime);
+            border-bottom-color: var(--lime);
+        }
+
+        /* Form */
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--fog);
+            margin-bottom: 6px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--ink-light);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: var(--lime);
+        }
+
+        .form-input::placeholder {
+            color: rgba(160,174,192,0.5);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 13px;
+            background: var(--lime);
+            color: var(--ink);
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+            margin-top: 6px;
+        }
+
+        .btn-submit:hover { opacity: 0.9; }
+        .btn-submit:active { transform: scale(0.98); }
+        .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .error-msg {
+            color: var(--danger);
+            font-size: 0.82rem;
+            margin-top: 12px;
+            text-align: center;
+            min-height: 20px;
+        }
+
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        .footer-text {
+            text-align: center;
+            margin-top: 24px;
+            color: var(--fog);
+            font-size: 0.78rem;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            background: var(--ink-card);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--lime);
+            color: var(--text);
+            padding: 14px 20px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            z-index: 9999;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.error { border-left-color: var(--danger); }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(40px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-container">
+    <div class="logo">
+        <div class="logo-icon">G</div>
+        <div class="logo-text">
+            MindScope GEO
+            <span>AI Visibility Monitor</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="tabs">
+            <button class="tab active" data-panel="loginPanel" id="tabLogin">로그인</button>
+            <button class="tab" data-panel="registerPanel" id="tabRegister">회원가입</button>
+        </div>
+
+        <!-- Login Panel -->
+        <div id="loginPanel" class="panel active">
+            <form id="loginForm" onsubmit="return false;">
+                <div class="form-group">
+                    <label class="form-label">이메일</label>
+                    <input class="form-input" type="email" id="loginEmail"
+                           placeholder="name@company.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">비밀번호</label>
+                    <input class="form-input" type="password" id="loginPassword"
+                           placeholder="비밀번호 입력" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn-submit" id="loginBtn">로그인</button>
+                <div class="error-msg" id="loginError"></div>
+            </form>
+        </div>
+
+        <!-- Register Panel -->
+        <div id="registerPanel" class="panel">
+            <form id="registerForm" onsubmit="return false;">
+                <div class="form-group">
+                    <label class="form-label">이메일</label>
+                    <input class="form-input" type="email" id="regEmail"
+                           placeholder="name@company.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">비밀번호</label>
+                    <input class="form-input" type="password" id="regPassword"
+                           placeholder="6자 이상" required autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">회사명 (선택)</label>
+                    <input class="form-input" type="text" id="regCompany"
+                           placeholder="예: 아모레퍼시픽" autocomplete="organization">
+                </div>
+                <button type="submit" class="btn-submit" id="regBtn">회원가입</button>
+                <div class="error-msg" id="regError"></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="footer-text">
+        &copy; 2026 MindScope GEO by HESED CORP.
+    </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Tab switching
+// ---------------------------------------------------------------------------
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.panel).classList.add('active');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Already logged in? redirect
+// ---------------------------------------------------------------------------
+if (localStorage.getItem('geo_token')) {
+    window.location.href = '/';
+}
+
+// ---------------------------------------------------------------------------
+// Login
+// ---------------------------------------------------------------------------
+document.getElementById('loginForm').addEventListener('submit', async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errEl = document.getElementById('loginError');
+    const btn = document.getElementById('loginBtn');
+
+    errEl.textContent = '';
+    btn.disabled = true;
+    btn.textContent = '로그인 중...';
+
+    try {
+        const resp = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            errEl.textContent = data.detail || '로그인에 실패했습니다.';
+            return;
+        }
+
+        localStorage.setItem('geo_token', data.token);
+        localStorage.setItem('geo_user', JSON.stringify(data.user));
+        window.location.href = '/';
+
+    } catch (e) {
+        errEl.textContent = '서버에 연결할 수 없습니다.';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '로그인';
+    }
+});
+
+// ---------------------------------------------------------------------------
+// Register
+// ---------------------------------------------------------------------------
+document.getElementById('registerForm').addEventListener('submit', async () => {
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    const company_name = document.getElementById('regCompany').value.trim() || null;
+    const errEl = document.getElementById('regError');
+    const btn = document.getElementById('regBtn');
+
+    errEl.textContent = '';
+    btn.disabled = true;
+    btn.textContent = '가입 중...';
+
+    try {
+        const resp = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password, company_name }),
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            errEl.textContent = data.detail || '회원가입에 실패했습니다.';
+            return;
+        }
+
+        localStorage.setItem('geo_token', data.token);
+        localStorage.setItem('geo_user', JSON.stringify(data.user));
+        window.location.href = '/';
+
+    } catch (e) {
+        errEl.textContent = '서버에 연결할 수 없습니다.';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '회원가입';
+    }
+});
+</script>
+</body>
+</html>

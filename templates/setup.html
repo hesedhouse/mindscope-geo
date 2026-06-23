@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindScope GEO — 초기 설정</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <style>
+        .setup-container {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+        .setup-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .setup-header h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .setup-header p {
+            color: var(--fog);
+            font-size: 0.9rem;
+        }
+        .setup-card {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+        .setup-card h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .setup-card .subtitle {
+            font-size: 0.8rem;
+            color: var(--fog);
+            margin-bottom: 24px;
+        }
+        .step-badge {
+            display: inline-block;
+            background: var(--lime);
+            color: var(--ink);
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 2px 10px;
+            border-radius: 20px;
+            margin-bottom: 12px;
+        }
+        .setup-actions {
+            text-align: center;
+            margin-top: 32px;
+        }
+        .success-banner {
+            background: rgba(198,255,61,0.1);
+            border: 1px solid rgba(198,255,61,0.2);
+            border-radius: var(--radius-sm);
+            padding: 16px 20px;
+            color: var(--lime);
+            font-size: 0.9rem;
+            text-align: center;
+            display: none;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<div class="setup-container">
+    <div class="setup-header">
+        <div class="logo" style="justify-content:center; margin-bottom:20px;">
+            <div class="logo-icon">G</div>
+            <div class="logo-text">MindScope GEO</div>
+        </div>
+        <h1>초기 설정</h1>
+        <p>클라이언트와 브랜드를 등록하면 AI 가시성 모니터링을 시작할 수 있습니다.</p>
+    </div>
+
+    <div id="successBanner" class="success-banner">
+        등록이 완료되었습니다. 대시보드로 이동합니다...
+    </div>
+
+    <!-- Step 1: Client -->
+    <div class="setup-card">
+        <span class="step-badge">STEP 1</span>
+        <h2>클라이언트 등록</h2>
+        <p class="subtitle">모니터링을 의뢰한 회사 또는 조직 정보를 입력하세요.</p>
+
+        <div class="form-group">
+            <label class="form-label">클라이언트명 *</label>
+            <input id="clientName" class="form-input" type="text" placeholder="예: 아모레퍼시픽">
+        </div>
+        <div class="form-group">
+            <label class="form-label">도메인 (선택)</label>
+            <input id="clientDomain" class="form-input" type="text" placeholder="예: amorepacific.com">
+        </div>
+        <button id="btnCreateClient" class="btn btn-primary" style="width:100%; justify-content:center;">
+            클라이언트 등록
+        </button>
+
+        <!-- 기존 클라이언트 선택 -->
+        <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+            <label class="form-label">또는 기존 클라이언트 선택</label>
+            <select id="existingClient" class="brand-select" style="width:100%;">
+                <option value="">기존 클라이언트 선택...</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Step 2: Brand -->
+    <div class="setup-card" id="brandSection" style="opacity:0.5; pointer-events:none;">
+        <span class="step-badge">STEP 2</span>
+        <h2>브랜드 등록</h2>
+        <p class="subtitle">모니터링할 브랜드와 경쟁사, 키워드를 설정하세요.</p>
+
+        <div class="form-group">
+            <label class="form-label">브랜드명 *</label>
+            <input id="brandName" class="form-input" type="text" placeholder="예: 설화수">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">경쟁사 (Enter로 추가)</label>
+            <div id="competitorTags" class="tag-container">
+                <input class="tag-input" type="text" placeholder="경쟁 브랜드명 입력 후 Enter"
+                       id="competitorInput">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">키워드 (Enter로 추가)</label>
+            <div id="keywordTags" class="tag-container">
+                <input class="tag-input" type="text" placeholder="검색 키워드 입력 후 Enter"
+                       id="keywordInput">
+            </div>
+        </div>
+
+        <button id="btnCreateBrand" class="btn btn-primary" style="width:100%; justify-content:center;">
+            브랜드 등록 및 시작
+        </button>
+    </div>
+
+    <div class="setup-actions">
+        <a href="/" class="btn btn-secondary">대시보드로 돌아가기</a>
+    </div>
+</div>
+
+<script>
+// Auth guard
+(function() {
+    const token = localStorage.getItem('geo_token');
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+})();
+
+// State
+let selectedClientId = null;
+const competitors = [];
+const keywords = [];
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+    loadExistingClients();
+    setupTagInputs();
+
+    document.getElementById('btnCreateClient').addEventListener('click', createClient);
+    document.getElementById('btnCreateBrand').addEventListener('click', createBrand);
+    document.getElementById('existingClient').addEventListener('change', (e) => {
+        if (e.target.value) {
+            selectedClientId = parseInt(e.target.value);
+            enableBrandSection();
+        }
+    });
+});
+
+// ---------------------------------------------------------------------------
+// API
+// ---------------------------------------------------------------------------
+async function api(url, options = {}) {
+    const token = localStorage.getItem('geo_token') || '';
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    const resp = await fetch(url, {
+        headers,
+        ...options,
+    });
+    if (resp.status === 401) {
+        localStorage.removeItem('geo_token');
+        localStorage.removeItem('geo_user');
+        window.location.href = '/login';
+        return;
+    }
+    if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+        throw new Error(err.detail || `HTTP ${resp.status}`);
+    }
+    return resp.json();
+}
+
+function showToast(msg, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = msg;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+// ---------------------------------------------------------------------------
+// Clients
+// ---------------------------------------------------------------------------
+async function loadExistingClients() {
+    try {
+        const clients = await api('/api/clients');
+        const sel = document.getElementById('existingClient');
+        clients.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.name + (c.domain ? ` (${c.domain})` : '');
+            sel.appendChild(opt);
+        });
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function createClient() {
+    const name = document.getElementById('clientName').value.trim();
+    if (!name) {
+        showToast('클라이언트명을 입력하세요.', 'error');
+        return;
+    }
+    const domain = document.getElementById('clientDomain').value.trim() || null;
+
+    try {
+        const client = await api('/api/clients', {
+            method: 'POST',
+            body: JSON.stringify({ name, domain }),
+        });
+        selectedClientId = client.id;
+        showToast(`"${client.name}" 클라이언트가 등록되었습니다.`, 'success');
+        enableBrandSection();
+
+        // Add to existing dropdown
+        const opt = document.createElement('option');
+        opt.value = client.id;
+        opt.textContent = client.name;
+        opt.selected = true;
+        document.getElementById('existingClient').appendChild(opt);
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+
+function enableBrandSection() {
+    const section = document.getElementById('brandSection');
+    section.style.opacity = '1';
+    section.style.pointerEvents = 'auto';
+}
+
+// ---------------------------------------------------------------------------
+// Brand
+// ---------------------------------------------------------------------------
+async function createBrand() {
+    if (!selectedClientId) {
+        showToast('먼저 클라이언트를 등록하거나 선택하세요.', 'error');
+        return;
+    }
+
+    const name = document.getElementById('brandName').value.trim();
+    if (!name) {
+        showToast('브랜드명을 입력하세요.', 'error');
+        return;
+    }
+
+    try {
+        const brand = await api('/api/brands', {
+            method: 'POST',
+            body: JSON.stringify({
+                client_id: selectedClientId,
+                name,
+                competitors: [...competitors],
+                keywords: [...keywords],
+            }),
+        });
+
+        showToast(`"${brand.name}" 브랜드가 등록되었습니다.`, 'success');
+        document.getElementById('successBanner').style.display = 'block';
+
+        // 1.5초 후 대시보드로 이동
+        setTimeout(() => { window.location.href = '/'; }, 1500);
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tag inputs
+// ---------------------------------------------------------------------------
+function setupTagInputs() {
+    setupTag('competitorInput', 'competitorTags', competitors);
+    setupTag('keywordInput', 'keywordTags', keywords);
+}
+
+function setupTag(inputId, containerId, arr) {
+    const input = document.getElementById(inputId);
+    const container = document.getElementById(containerId);
+
+    // Focus input when clicking container
+    container.addEventListener('click', () => input.focus());
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = input.value.trim();
+            if (val && !arr.includes(val)) {
+                arr.push(val);
+                renderTags(containerId, arr, input);
+            }
+            input.value = '';
+        }
+        if (e.key === 'Backspace' && !input.value && arr.length > 0) {
+            arr.pop();
+            renderTags(containerId, arr, input);
+        }
+    });
+}
+
+function renderTags(containerId, arr, input) {
+    const container = document.getElementById(containerId);
+    // Remove existing tags
+    container.querySelectorAll('.tag').forEach(t => t.remove());
+    // Re-add
+    arr.forEach((val, idx) => {
+        const tag = document.createElement('span');
+        tag.className = 'tag';
+        tag.innerHTML = `${escapeHtml(val)} <span class="tag-remove" data-idx="${idx}">&times;</span>`;
+        tag.querySelector('.tag-remove').addEventListener('click', () => {
+            arr.splice(idx, 1);
+            renderTags(containerId, arr, input);
+        });
+        container.insertBefore(tag, input);
+    });
+}
+
+function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+</script>
+</body>
+</html>

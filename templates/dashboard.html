@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindScope GEO — AI Visibility Dashboard</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<!-- Toast Container -->
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <p>로딩 중...</p>
+</div>
+
+<div class="app-container">
+
+    <!-- Header -->
+    <header class="app-header">
+        <div class="logo">
+            <div class="logo-icon">G</div>
+            <div class="logo-text">
+                MindScope GEO
+                <span>AI Visibility Monitor</span>
+            </div>
+        </div>
+        <div class="header-controls">
+            <select id="brandSelect" class="brand-select">
+                <option value="">브랜드를 선택하세요</option>
+            </select>
+            <a href="/setup" class="btn btn-secondary" style="font-size:0.8rem; padding:8px 14px;">설정</a>
+            <span id="userEmail" style="font-size:0.78rem; color:var(--fog); margin-left:8px;"></span>
+            <button id="btnLogout" class="btn btn-secondary" style="font-size:0.75rem; padding:6px 12px; margin-left:4px; display:none;">로그아웃</button>
+        </div>
+    </header>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div>
+            <span class="status-dot"></span>
+            <span id="statusText">대시보드 준비 완료</span>
+        </div>
+        <div id="lastUpdate"></div>
+    </div>
+
+    <!-- No Brand State -->
+    <div id="noBrandState" class="no-brand-overlay">
+        <div class="empty-state">
+            <div class="empty-state-icon">&#x2191;</div>
+            <h3>브랜드를 선택하세요</h3>
+            <p>상단 드롭다운에서 모니터링할 브랜드를 선택하면 대시보드가 표시됩니다.</p>
+        </div>
+    </div>
+
+    <!-- Dashboard Content (hidden until brand selected) -->
+    <div id="dashboardContent" style="display:none;">
+
+        <!-- Metric Cards -->
+        <div class="metrics-grid">
+            <div class="metric-card" id="metricVisibility">
+                <div class="metric-label">Visibility Score</div>
+                <div class="metric-value">—</div>
+                <div class="metric-change neutral">데이터 없음</div>
+            </div>
+            <div class="metric-card" id="metricSov">
+                <div class="metric-label">AI Share of Voice</div>
+                <div class="metric-value">—</div>
+                <div class="metric-change neutral">데이터 없음</div>
+            </div>
+            <div class="metric-card" id="metricSentiment">
+                <div class="metric-label">Sentiment Score</div>
+                <div class="metric-value">—</div>
+                <div class="metric-change neutral">데이터 없음</div>
+            </div>
+            <div class="metric-card" id="metricPrompts">
+                <div class="metric-label">Prompts Tracked</div>
+                <div class="metric-value">—</div>
+                <div class="metric-change neutral">데이터 없음</div>
+            </div>
+        </div>
+
+        <!-- Visibility Trend Chart (full width) -->
+        <div class="charts-row">
+            <div class="chart-card">
+                <div class="chart-card-title">
+                    Visibility Score 추이
+                    <span class="badge">최근 30일</span>
+                </div>
+                <div class="chart-wrapper line-chart">
+                    <canvas id="visibilityChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- SoV Doughnut + Engine Bar (half-half) -->
+        <div class="charts-row-half">
+            <div class="chart-card">
+                <div class="chart-card-title">AI Share of Voice</div>
+                <div class="chart-wrapper doughnut-chart">
+                    <canvas id="sovChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-card-title">엔진별 Visibility</div>
+                <div class="chart-wrapper bar-chart">
+                    <canvas id="engineBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Table -->
+        <div class="table-card">
+            <div class="table-card-header">
+                <div class="table-card-title">최근 스캔 결과</div>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>프롬프트</th>
+                            <th>엔진</th>
+                            <th>브랜드 언급</th>
+                            <th>감성</th>
+                            <th>시간</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody">
+                        <tr>
+                            <td colspan="5" style="text-align:center; color:var(--fog); padding:40px;">
+                                스캔 결과가 없습니다. 스캔을 실행해주세요.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Optimization Recommendations -->
+        <div class="table-card" id="recommendationsSection">
+            <div class="table-card-header">
+                <div class="table-card-title">최적화 추천 (GEO Optimization Guide)</div>
+            </div>
+            <div id="recommendationsContainer" style="padding:16px;">
+                <p style="text-align:center; color:var(--fog); padding:20px;">
+                    브랜드를 선택하고 스캔을 실행하면 최적화 추천이 표시됩니다.
+                </p>
+            </div>
+        </div>
+
+        <!-- Action Bar -->
+        <div class="action-bar">
+            <button id="btnScan" class="btn btn-primary">
+                &#9654; 스캔 실행
+            </button>
+            <button id="btnPrompts" class="btn btn-secondary">
+                &#9998; 프롬프트 관리
+            </button>
+            <button id="btnReport" class="btn btn-secondary">
+                &#128196; 리포트 보기
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Prompt Modal Backdrop -->
+<div id="modalBackdrop" class="modal-backdrop"></div>
+
+<!-- Prompt Modal -->
+<div id="promptModal" class="modal">
+    <div class="modal-title">
+        프롬프트 관리
+        <button id="modalClose" class="modal-close">&times;</button>
+    </div>
+
+    <!-- Current prompts -->
+    <div style="margin-bottom:20px;">
+        <div class="form-label" style="margin-bottom:10px;">등록된 프롬프트</div>
+        <ul id="promptList" class="prompt-list">
+            <li class="prompt-item" style="color:var(--fog); justify-content:center;">로딩 중...</li>
+        </ul>
+    </div>
+
+    <!-- Add new prompt -->
+    <div class="form-group">
+        <label class="form-label">새 프롬프트 추가</label>
+        <div style="display:flex; gap:8px;">
+            <input id="newPromptText" class="form-input" type="text"
+                   placeholder="예: 좋은 선크림 추천해줘" style="flex:1;">
+            <button id="btnAddPrompt" class="btn btn-primary" style="white-space:nowrap;">추가</button>
+        </div>
+    </div>
+
+    <!-- Auto generate -->
+    <div style="border-top:1px solid var(--border); padding-top:16px; margin-top:8px;">
+        <button id="btnGeneratePrompts" class="btn btn-secondary" style="width:100%; justify-content:center;">
+            &#x2728; 키워드 기반 자동 생성
+        </button>
+        <p style="font-size:0.75rem; color:var(--fog); margin-top:8px; text-align:center;">
+            브랜드에 등록된 키워드를 기반으로 AI가 검색 프롬프트를 자동 생성합니다.
+        </p>
+    </div>
+</div>
+
+<script>
+// Auth guard: 토큰 없으면 로그인 페이지로
+(function() {
+    const token = localStorage.getItem('geo_token');
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+    // 사용자 정보 표시
+    try {
+        const user = JSON.parse(localStorage.getItem('geo_user') || '{}');
+        if (user.email) {
+            document.getElementById('userEmail').textContent = user.email;
+            document.getElementById('btnLogout').style.display = '';
+        }
+    } catch(e) {}
+
+    document.getElementById('btnLogout').addEventListener('click', function() {
+        localStorage.removeItem('geo_token');
+        localStorage.removeItem('geo_user');
+        window.location.href = '/login';
+    });
+})();
+</script>
+<script src="/static/js/dashboard.js"></script>
+</body>
+</html>

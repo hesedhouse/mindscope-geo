@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+aiosqlite
+httpx
+openai
+google-genai
+python-dotenv
+jinja2
+pydantic
+apscheduler
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+anthropic

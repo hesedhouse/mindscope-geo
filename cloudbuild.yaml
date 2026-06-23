@@ -1,0 +1,20 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/mindscope-geo', '.']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/mindscope-geo']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'mindscope-geo'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/mindscope-geo'
+      - '--region'
+      - 'asia-northeast3'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'OPENAI_API_KEY=${_OPENAI_API_KEY},GEMINI_API_KEY=${_GEMINI_API_KEY},PERPLEXITY_API_KEY=${_PERPLEXITY_API_KEY},ANTHROPIC_API_KEY=${_ANTHROPIC_API_KEY},JWT_SECRET=${_JWT_SECRET},DATABASE_URL=${_DATABASE_URL}'
