@@ -251,19 +251,29 @@
         <div id="registerPanel" class="panel">
             <form id="registerForm" onsubmit="return false;">
                 <div class="form-group">
+                    <label class="form-label">회사명</label>
+                    <input class="form-input" type="text" id="regCompany"
+                           placeholder="예: 아모레퍼시픽" autocomplete="organization">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">담당자명</label>
+                    <input class="form-input" type="text" id="regName"
+                           placeholder="예: 홍길동" required autocomplete="name">
+                </div>
+                <div class="form-group">
                     <label class="form-label">이메일</label>
                     <input class="form-input" type="email" id="regEmail"
                            placeholder="name@company.com" required autocomplete="email">
                 </div>
                 <div class="form-group">
+                    <label class="form-label">휴대폰번호</label>
+                    <input class="form-input" type="tel" id="regPhone"
+                           placeholder="010-0000-0000" required autocomplete="tel">
+                </div>
+                <div class="form-group">
                     <label class="form-label">비밀번호</label>
                     <input class="form-input" type="password" id="regPassword"
                            placeholder="6자 이상" required autocomplete="new-password">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">회사명 (선택)</label>
-                    <input class="form-input" type="text" id="regCompany"
-                           placeholder="예: 아모레퍼시픽" autocomplete="organization">
                 </div>
                 <button type="submit" class="btn-submit" id="regBtn">회원가입</button>
                 <div class="error-msg" id="regError"></div>
@@ -342,6 +352,8 @@ document.getElementById('registerForm').addEventListener('submit', async () => {
     const email = document.getElementById('regEmail').value.trim();
     const password = document.getElementById('regPassword').value;
     const company_name = document.getElementById('regCompany').value.trim() || null;
+    const name = document.getElementById('regName').value.trim();
+    const phone = document.getElementById('regPhone').value.trim();
     const errEl = document.getElementById('regError');
     const btn = document.getElementById('regBtn');
 
@@ -353,7 +365,7 @@ document.getElementById('registerForm').addEventListener('submit', async () => {
         const resp = await fetch('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, company_name }),
+            body: JSON.stringify({ email, password, company_name, name, phone }),
         });
 
         const data = await resp.json();

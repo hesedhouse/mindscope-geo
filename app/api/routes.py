@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import AI_ENGINES, OPENAI_API_KEY
 from app.db.database import get_session
-from app.db.models import Brand, Client, ScanPrompt, ScanResult, User, VisibilityScore
+from app.db.models import Brand, Client, DiagnosisRequest, ScanPrompt, ScanResult, User, VisibilityScore
 from app.auth import get_current_user, require_current_user
 
 logger = logging.getLogger(__name__)
@@ -870,21 +870,30 @@ async def my_plan(
 # Free Diagnosis (no auth required)
 # ---------------------------------------------------------------------------
 
-class DiagnoseRequest(BaseModel):
+class DiagnoseRequestBody(BaseModel):
+    email: str
+    name: str
+    company_name: str = ""
+    phone: str
     brand_name: str
     keywords: list[str]
     competitors: list[str] = []
 
 
-# Simple in-memory cache for rate limiting: {brand_name_lower: (timestamp, result)}
-_diagnose_cache: dict[str, tuple[float, dict]] = {}
-_CACHE_TTL = 600  # 10 minutes
+class DiagnoseVerifyBody(BaseModel):
+    request_id: int
+    code: str
 
 
-@router.post("/api/diagnose")
-async def run_diagnosis(body: DiagnoseRequest):
-    """고객용 무료 AI 가시성 진단 — 인증 불필요."""
-    import time as _time
+@router.post("/api/diagnose/request")
+async def request_diagnosis(
+    body: DiagnoseRequestBody,
+    session: AsyncSession = Depends(get_session),
+):
+    """무료 진단 요청 — 이메일 인증코드 발송 (실제 발송은 미구현, debug_code로 반환)."""
+    import re
+    import random
+    from datetime import timedelta
 
     brand = body.brand_name.strip()
     if not brand:
@@ -892,24 +901,93 @@ async def run_diagnosis(body: DiagnoseRequest):
     if not body.keywords:
         raise HTTPException(400, "키워드를 1개 이상 입력해주세요.")
 
-    cache_key = brand.lower()
-    now = _time.time()
+    email = body.email.strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(400, "올바른 이메일을 입력해주세요.")
 
-    # Rate limit: 같은 brand_name으로 10분 내 재요청 시 캐시 반환
-    if cache_key in _diagnose_cache:
-        cached_ts, cached_result = _diagnose_cache[cache_key]
-        if now - cached_ts < _CACHE_TTL:
-            logger.info("진단 캐시 히트: %s", brand)
-            return cached_result
+    if not body.name or not body.name.strip():
+        raise HTTPException(400, "담당자명을 입력해주세요.")
 
-    # 프롬프트 자동 생성 (키워드 기반 3개)
+    if not body.phone or not body.phone.strip():
+        raise HTTPException(400, "휴대폰번호를 입력해주세요.")
+
+    phone_digits = re.sub(r"\D", "", body.phone)
+    if not (10 <= len(phone_digits) <= 11):
+        raise HTTPException(400, "올바른 휴대폰번호를 입력해주세요. (10~11자리)")
+
+    if not body.company_name or not body.company_name.strip():
+        raise HTTPException(400, "회사명을 입력해주세요.")
+
+    # 같은 이메일로 24시간 내 인증 완료된 요청이 있는지 확인
+    cutoff = datetime.utcnow() - timedelta(hours=24)
+    existing = await session.execute(
+        select(DiagnosisRequest).where(
+            DiagnosisRequest.email == email,
+            DiagnosisRequest.created_at >= cutoff,
+            DiagnosisRequest.is_verified == True,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(429, "이미 진단을 요청하셨습니다. 24시간 후 다시 시도해주세요.")
+
+    # 6자리 인증코드 생성
+    code = f"{random.randint(0, 999999):06d}"
+
+    diag_req = DiagnosisRequest(
+        email=email,
+        name=body.name.strip(),
+        company_name=body.company_name.strip(),
+        phone=phone_digits,
+        brand_name=brand,
+        keywords=body.keywords,
+        competitors=body.competitors,
+        verification_code=code,
+        is_verified=False,
+    )
+    session.add(diag_req)
+    await session.commit()
+    await session.refresh(diag_req)
+
+    # TODO: 실제 이메일 발송 (SendGrid 등) — 현재는 debug_code로 반환
+    logger.info("진단 인증코드 발송 (debug): email=%s, code=%s", email, code)
+
+    return {
+        "request_id": diag_req.id,
+        "message": "인증코드를 이메일로 발송했습니다.",
+        "debug_code": code,  # 테스트용 — 프로덕션에서 제거
+    }
+
+
+@router.post("/api/diagnose/verify")
+async def verify_and_run_diagnosis(
+    body: DiagnoseVerifyBody,
+    session: AsyncSession = Depends(get_session),
+):
+    """인증코드 확인 후 AI 진단 실행."""
+    diag_req = await session.get(DiagnosisRequest, body.request_id)
+    if not diag_req:
+        raise HTTPException(404, "진단 요청을 찾을 수 없습니다.")
+
+    if diag_req.is_verified and diag_req.result_data:
+        return diag_req.result_data
+
+    if diag_req.verification_code != body.code.strip():
+        raise HTTPException(400, "인증코드가 올바르지 않습니다. 다시 확인해주세요.")
+
+    diag_req.is_verified = True
+
+    # --- 기존 진단 로직 실행 ---
+    brand = diag_req.brand_name
+    keywords = diag_req.keywords or []
+    competitors = diag_req.competitors or []
+
+    # 프롬프트 자동 생성
     prompts: list[str] = []
-    for kw in body.keywords[:5]:
+    for kw in keywords[:5]:
         prompts.append(f"{kw} 추천해줘")
         prompts.append(f"좋은 {kw} 브랜드")
         prompts.append(f"{kw} 순위")
 
-    # 엔진 인스턴스
     engines = _get_enabled_engines()
     if not engines:
         raise HTTPException(
@@ -918,12 +996,11 @@ async def run_diagnosis(body: DiagnoseRequest):
         )
 
     brand_lower = brand.lower()
-    competitor_names = [c.strip().lower() for c in body.competitors if c.strip()]
 
     raw_results: list[dict] = []
-    engine_mention_counts: dict[str, dict] = {}  # engine -> {total, mentioned}
+    engine_mention_counts: dict[str, dict] = {}
     all_mention_counts: dict[str, int] = {brand: 0}
-    for comp in body.competitors:
+    for comp in competitors:
         if comp.strip():
             all_mention_counts[comp.strip()] = 0
 
@@ -937,7 +1014,6 @@ async def run_diagnosis(body: DiagnoseRequest):
 
                 mentioned = brand_lower in resp_lower
 
-                # Engine stats
                 if engine.name not in engine_mention_counts:
                     engine_mention_counts[engine.name] = {"total": 0, "mentioned": 0}
                 engine_mention_counts[engine.name]["total"] += 1
@@ -945,13 +1021,11 @@ async def run_diagnosis(body: DiagnoseRequest):
                     engine_mention_counts[engine.name]["mentioned"] += 1
                     all_mention_counts[brand] = all_mention_counts.get(brand, 0) + 1
 
-                # Competitor mentions
-                for comp in body.competitors:
+                for comp in competitors:
                     comp_clean = comp.strip()
                     if comp_clean and comp_clean.lower() in resp_lower:
                         all_mention_counts[comp_clean] = all_mention_counts.get(comp_clean, 0) + 1
 
-                # Sentiment
                 sent = _estimate_sentiment(resp.response_text, brand)
                 sentiment_scores.append(sent)
 
@@ -969,33 +1043,26 @@ async def run_diagnosis(body: DiagnoseRequest):
                     "error": str(e),
                 })
 
-    # Score calculation
     total_queries = sum(ec["total"] for ec in engine_mention_counts.values())
     total_mentioned = sum(ec["mentioned"] for ec in engine_mention_counts.values())
-
     visibility = (total_mentioned / total_queries * 100) if total_queries > 0 else 0
 
-    # SOV
     total_all_mentions = sum(all_mention_counts.values())
     sov_score = (all_mention_counts.get(brand, 0) / total_all_mentions * 100) if total_all_mentions > 0 else 0
     sov_dict: dict[str, int] = {}
     for name, cnt in all_mention_counts.items():
         sov_dict[name] = round((cnt / total_all_mentions * 100), 1) if total_all_mentions > 0 else 0
 
-    # Sentiment
     avg_sentiment = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores else 0
 
-    # Overall
     overall = round(visibility * 0.5 + sov_score * 0.3 + (avg_sentiment + 1) * 50 * 0.2, 1)
     overall = max(0, min(100, overall))
 
-    # Engine scores
     engine_scores: dict[str, int] = {}
     for eng_name, counts in engine_mention_counts.items():
         eng_score = round(counts["mentioned"] / counts["total"] * 100) if counts["total"] > 0 else 0
         engine_scores[eng_name] = eng_score
 
-    # Grade
     if overall <= 20:
         grade = "매우 낮음"
     elif overall <= 40:
@@ -1007,12 +1074,10 @@ async def run_diagnosis(body: DiagnoseRequest):
     else:
         grade = "매우 높음"
 
-    # Projected score
     projected = round(min(overall * 2.5, 85))
     if overall == 0:
         projected = 35
 
-    # Improvements
     improvements = _generate_diagnosis_improvements(overall, sov_score, avg_sentiment, visibility)
 
     result = {
@@ -1027,13 +1092,8 @@ async def run_diagnosis(body: DiagnoseRequest):
         "raw_results": raw_results,
     }
 
-    # Cache
-    _diagnose_cache[cache_key] = (now, result)
-
-    # Cleanup old cache entries
-    expired = [k for k, (ts, _) in _diagnose_cache.items() if now - ts > _CACHE_TTL]
-    for k in expired:
-        _diagnose_cache.pop(k, None)
+    diag_req.result_data = result
+    await session.commit()
 
     return result
 

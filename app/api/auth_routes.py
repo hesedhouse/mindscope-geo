@@ -27,6 +27,8 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     company_name: str | None = None
+    name: str
+    phone: str
 
 
 class LoginRequest(BaseModel):
@@ -38,6 +40,8 @@ class UserResponse(BaseModel):
     id: int
     email: str
     company_name: str | None
+    name: str | None
+    phone: str | None
     plan: str
 
     class Config:
@@ -73,10 +77,32 @@ async def register(
             detail="비밀번호는 6자 이상이어야 합니다.",
         )
 
+    # name / phone 필수값 검증
+    if not body.name or not body.name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="담당자명을 입력해주세요.",
+        )
+    if not body.phone or not body.phone.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="휴대폰번호를 입력해주세요.",
+        )
+
+    import re
+    phone_digits = re.sub(r"\D", "", body.phone)
+    if not (10 <= len(phone_digits) <= 11):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="올바른 휴대폰번호를 입력해주세요. (10~11자리)",
+        )
+
     user = User(
         email=body.email,
         hashed_password=hash_password(body.password),
         company_name=body.company_name,
+        name=body.name.strip(),
+        phone=phone_digits,
     )
     session.add(user)
     await session.commit()
@@ -90,6 +116,8 @@ async def register(
             id=user.id,
             email=user.email,
             company_name=user.company_name,
+            name=user.name,
+            phone=user.phone,
             plan=user.plan,
         ),
     )
@@ -124,6 +152,8 @@ async def login(
             id=user.id,
             email=user.email,
             company_name=user.company_name,
+            name=user.name,
+            phone=user.phone,
             plan=user.plan,
         ),
     )
@@ -138,5 +168,7 @@ async def get_me(
         id=user.id,
         email=user.email,
         company_name=user.company_name,
+        name=user.name,
+        phone=user.phone,
         plan=user.plan,
     )

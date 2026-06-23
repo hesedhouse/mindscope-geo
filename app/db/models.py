@@ -17,6 +17,8 @@ class User(Base):
     email = Column(String(320), unique=True, nullable=False, index=True)
     hashed_password = Column(String(512), nullable=False)
     company_name = Column(String(200), nullable=True)
+    name = Column(String(100), nullable=True)
+    phone = Column(String(20), nullable=True)
     is_active = Column(Boolean, default=True)
     plan = Column(String(50), default="free")  # free, starter, pro, enterprise
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -97,3 +99,20 @@ class VisibilityScore(Base):
     calculated_at = Column(DateTime, default=datetime.utcnow)
 
     brand = relationship("Brand", back_populates="visibility_scores")
+
+
+class DiagnosisRequest(Base):
+    __tablename__ = "diagnosis_requests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String(320), nullable=False, index=True)
+    name = Column(String(100), nullable=True)
+    company_name = Column(String(200), nullable=True)
+    phone = Column(String(20), nullable=True)
+    brand_name = Column(String(200), nullable=False)
+    keywords = Column(JSON, default=list)
+    competitors = Column(JSON, default=list)
+    verification_code = Column(String(6), nullable=True)
+    is_verified = Column(Boolean, default=False)
+    result_data = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

@@ -239,7 +239,7 @@ a{color:inherit;text-decoration:none}
   <a href="https://mindscope-geo-915005618960.us-central1.run.app/pricing" class="mini-nav-link">요금제 보기</a>
 </div>
 
-<!-- STEP 1: INPUT -->
+<!-- STEP 1a: INPUT -->
 <div class="step step-input active" id="stepInput">
   <div class="wrap" style="display:flex;flex-direction:column;align-items:center">
     <h1 class="headline">AI가 당신의 브랜드를<br><span class="lime">추천하고 있을까요?</span></h1>
@@ -260,11 +260,54 @@ a{color:inherit;text-decoration:none}
         <input class="form-input" id="competitors" type="text" placeholder="예: 라네즈, 미샤">
         <div class="form-hint">쉼표(,)로 구분하여 입력하세요</div>
       </div>
-      <button class="btn-diagnose" id="btnStart" onclick="startDiagnosis()">무료 진단 시작</button>
+
+      <div style="border-top:1px solid rgba(255,255,255,0.1);margin:28px 0 24px"></div>
+
+      <div class="form-group">
+        <label class="form-label">회사명 <span class="req">*</span></label>
+        <input class="form-input" id="diagCompany" type="text" placeholder="예: 아모레퍼시픽" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">담당자명 <span class="req">*</span></label>
+        <input class="form-input" id="diagName" type="text" placeholder="예: 홍길동" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">이메일 <span class="req">*</span></label>
+        <input class="form-input" id="diagEmail" type="email" placeholder="name@company.com" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">휴대폰번호 <span class="req">*</span></label>
+        <input class="form-input" id="diagPhone" type="tel" placeholder="010-0000-0000" required>
+      </div>
+
+      <button class="btn-diagnose" id="btnStart" onclick="requestDiagnosis()">무료 진단 요청</button>
       <div class="error-msg" id="errorMsg"></div>
     </div>
     <div class="form-footer">
       약 30초 소요 <span>·</span> ChatGPT + Gemini 2개 엔진 분석 <span>·</span> 무료
+    </div>
+  </div>
+</div>
+
+<!-- STEP 1b: VERIFY -->
+<div class="step step-input" id="stepVerify">
+  <div class="wrap" style="display:flex;flex-direction:column;align-items:center">
+    <h1 class="headline" style="font-size:clamp(22px,3.5vw,36px)">이메일 인증</h1>
+    <p class="sub" id="verifyEmailMsg">인증코드를 이메일로 발송했습니다.</p>
+
+    <div class="form-card" style="text-align:center">
+      <div class="form-group">
+        <label class="form-label" style="text-align:center">인증코드 6자리를 입력하세요</label>
+        <input class="form-input" id="verifyCode" type="text" maxlength="6"
+               placeholder="000000" required
+               style="text-align:center;font-size:28px;font-weight:900;letter-spacing:12px;padding:18px">
+      </div>
+      <button class="btn-diagnose" id="btnVerify" onclick="verifyAndRun()">확인</button>
+      <div class="error-msg" id="verifyError"></div>
+      <div style="margin-top:20px">
+        <span style="font-size:13px;color:rgba(255,255,255,0.4);cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.2)"
+              onclick="resendCode()">코드를 받지 못했나요? 재발송</span>
+      </div>
     </div>
   </div>
 </div>
@@ -363,6 +406,9 @@ a{color:inherit;text-decoration:none}
 </div>
 
 <script>
+var _currentRequestId = null;
+var _currentRequestBody = null;
+
 function showStep(id){
   document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -375,34 +421,116 @@ function showError(msg){
   setTimeout(()=>{el.style.display='none'},5000);
 }
 
+function showVerifyError(msg){
+  var el=document.getElementById('verifyError');
+  el.textContent=msg;el.style.display='block';
+  setTimeout(()=>{el.style.display='none'},5000);
+}
+
 function resetForm(){
   document.getElementById('brandName').value='';
   document.getElementById('keywords').value='';
   document.getElementById('competitors').value='';
+  document.getElementById('diagCompany').value='';
+  document.getElementById('diagName').value='';
+  document.getElementById('diagEmail').value='';
+  document.getElementById('diagPhone').value='';
+  document.getElementById('verifyCode').value='';
+  _currentRequestId=null;
+  _currentRequestBody=null;
   showStep('stepInput');
 }
 
-async function startDiagnosis(){
+async function requestDiagnosis(){
   var brand=document.getElementById('brandName').value.trim();
   var kwRaw=document.getElementById('keywords').value.trim();
   var compRaw=document.getElementById('competitors').value.trim();
+  var company=document.getElementById('diagCompany').value.trim();
+  var name=document.getElementById('diagName').value.trim();
+  var email=document.getElementById('diagEmail').value.trim();
+  var phone=document.getElementById('diagPhone').value.trim();
 
   if(!brand){showError('브랜드명을 입력해주세요.');return;}
   if(!kwRaw){showError('업종/키워드를 입력해주세요.');return;}
+  if(!company){showError('회사명을 입력해주세요.');return;}
+  if(!name){showError('담당자명을 입력해주세요.');return;}
+  if(!email){showError('이메일을 입력해주세요.');return;}
+  if(!phone){showError('휴대폰번호를 입력해주세요.');return;}
 
   var keywords=kwRaw.split(/[,，]/).map(s=>s.trim()).filter(Boolean);
   var competitors=compRaw?compRaw.split(/[,，]/).map(s=>s.trim()).filter(Boolean).slice(0,3):[];
 
-  // Disable button
   var btn=document.getElementById('btnStart');
-  btn.disabled=true;btn.textContent='진단 준비 중...';
+  btn.disabled=true;btn.textContent='요청 중...';
+
+  _currentRequestBody={
+    email:email, name:name, company_name:company, phone:phone,
+    brand_name:brand, keywords:keywords, competitors:competitors
+  };
+
+  try{
+    var resp=await fetch('/api/diagnose/request',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(_currentRequestBody)
+    });
+    var data=await resp.json();
+    if(!resp.ok){
+      throw new Error(data.detail||'요청에 실패했습니다.');
+    }
+    _currentRequestId=data.request_id;
+
+    // debug_code가 있으면 자동 입력 (개발 편의)
+    if(data.debug_code){
+      document.getElementById('verifyCode').value=data.debug_code;
+    }
+
+    document.getElementById('verifyEmailMsg').textContent=
+      email+' 으로 인증코드를 발송했습니다.';
+    showStep('stepVerify');
+  }catch(e){
+    showError(e.message||'요청 중 오류가 발생했습니다.');
+  }finally{
+    btn.disabled=false;btn.textContent='무료 진단 요청';
+  }
+}
+
+async function resendCode(){
+  if(!_currentRequestBody) return;
+  try{
+    var resp=await fetch('/api/diagnose/request',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(_currentRequestBody)
+    });
+    var data=await resp.json();
+    if(!resp.ok){
+      showVerifyError(data.detail||'재발송에 실패했습니다.');
+      return;
+    }
+    _currentRequestId=data.request_id;
+    if(data.debug_code){
+      document.getElementById('verifyCode').value=data.debug_code;
+    }
+    showVerifyError('');
+    document.getElementById('verifyEmailMsg').textContent='인증코드를 다시 발송했습니다.';
+  }catch(e){
+    showVerifyError('재발송 중 오류가 발생했습니다.');
+  }
+}
+
+async function verifyAndRun(){
+  var code=document.getElementById('verifyCode').value.trim();
+  if(!code||code.length!==6){showVerifyError('6자리 인증코드를 입력해주세요.');return;}
+
+  var btn=document.getElementById('btnVerify');
+  btn.disabled=true;btn.textContent='확인 중...';
 
   // Switch to loading
   showStep('stepLoading');
   var steps=document.querySelectorAll('.loading-step');
   steps.forEach(s=>{s.classList.remove('active','done')});
 
-  // Animate loading steps in parallel with API call
   var stepIdx=0;
   var loadInterval=setInterval(function(){
     if(stepIdx>0) steps[stepIdx-1].classList.remove('active'),steps[stepIdx-1].classList.add('done'),steps[stepIdx-1].querySelector('.icon').textContent='\u2713';
@@ -412,31 +540,29 @@ async function startDiagnosis(){
   },2000);
 
   try{
-    var resp=await fetch('/api/diagnose',{
+    var resp=await fetch('/api/diagnose/verify',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({brand_name:brand,keywords:keywords,competitors:competitors})
+      body:JSON.stringify({request_id:_currentRequestId,code:code})
     });
     if(!resp.ok){
-      var errData=await resp.json().catch(()=>({detail:'진단에 실패했습니다.'}));
-      throw new Error(errData.detail||'진단에 실패했습니다.');
+      var errData=await resp.json().catch(()=>({detail:'인증에 실패했습니다.'}));
+      throw new Error(errData.detail||'인증에 실패했습니다.');
     }
     var data=await resp.json();
 
-    // Finish all loading steps
     clearInterval(loadInterval);
     steps.forEach(s=>{s.classList.remove('active');s.classList.add('done');s.querySelector('.icon').textContent='\u2713'});
 
-    // Brief pause then show results
     await new Promise(r=>setTimeout(r,800));
     renderResults(data);
     showStep('stepResult');
   }catch(e){
     clearInterval(loadInterval);
-    showStep('stepInput');
-    showError(e.message||'진단 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    showStep('stepVerify');
+    showVerifyError(e.message||'진단 중 오류가 발생했습니다.');
   }finally{
-    btn.disabled=false;btn.textContent='무료 진단 시작';
+    btn.disabled=false;btn.textContent='확인';
   }
 }
 
