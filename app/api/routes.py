@@ -17,7 +17,7 @@ from sqlalchemy.orm import selectinload
 from app.config import AI_ENGINES, OPENAI_API_KEY
 from app.db.database import get_session
 from app.db.models import Brand, Client, ScanPrompt, ScanResult, User, VisibilityScore
-from app.auth import get_current_user
+from app.auth import get_current_user, require_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -259,8 +259,52 @@ async def generate_prompts(brand_id: int, session: AsyncSession = Depends(get_se
 # ---------------------------------------------------------------------------
 
 @router.post("/api/scan/{brand_id}")
-async def run_scan(brand_id: int, session: AsyncSession = Depends(get_session)):
+async def run_scan(
+    brand_id: int,
+    session: AsyncSession = Depends(get_session),
+    current_user: Optional[User] = Depends(get_current_user),
+):
     """수동 스캔 실행 — 활성 프롬프트를 각 AI 엔진에 전송."""
+    # ── 플랜 제한 체크 ──
+    if current_user:
+        from app.plans import check_daily_scan_limit, check_limit
+
+        user_plan = current_user.plan or "free"
+
+        # 활성 프롬프트 수 체크
+        prompt_count_result = await session.execute(
+            select(func.count(ScanPrompt.id)).where(
+                ScanPrompt.brand_id == brand_id, ScanPrompt.is_active == True
+            )
+        )
+        prompt_count = prompt_count_result.scalar() or 0
+        if not check_limit(user_plan, "prompts", prompt_count):
+            raise HTTPException(
+                403,
+                f"현재 플랜({user_plan})의 프롬프트 제한을 초과했습니다. "
+                "업그레이드가 필요합니다.",
+            )
+
+        # 일일 스캔 횟수 체크
+        today = date.today()
+        scan_count_result = await session.execute(
+            select(func.count(ScanResult.id))
+            .join(ScanPrompt)
+            .where(
+                ScanPrompt.brand_id == brand_id,
+                func.date(ScanResult.scanned_at) == today,
+            )
+        )
+        today_scan_count = scan_count_result.scalar() or 0
+        # 프롬프트 수 기준 (각 프롬프트 x 엔진이 1 스캔 세트)
+        scan_set_count = 1 if today_scan_count > 0 else 0
+        if not check_daily_scan_limit(user_plan, scan_set_count):
+            raise HTTPException(
+                403,
+                f"현재 플랜({user_plan})의 일일 스캔 제한을 초과했습니다. "
+                "내일 다시 시도하거나 업그레이드하세요.",
+            )
+
     brand = await session.get(Brand, brand_id)
     if not brand:
         raise HTTPException(404, "브랜드를 찾을 수 없습니다.")
@@ -693,3 +737,130 @@ async def run_schedule_now():
 
     asyncio.create_task(daily_scan_job())
     return {"message": "전체 스캔이 백그라운드에서 시작되었습니다.", "status": "started"}
+
+
+# ---------------------------------------------------------------------------
+# Plan management
+# ---------------------------------------------------------------------------
+
+class PlanUpgradeRequest(BaseModel):
+    plan: str
+
+
+@router.get("/api/plans")
+async def list_plans():
+    """전체 요금제 목록 반환."""
+    from app.plans import PLANS, format_price
+
+    result = []
+    for key, plan in PLANS.items():
+        result.append({
+            "id": key,
+            "name": plan["name"],
+            "price_monthly": plan["price_monthly"],
+            "price_display": format_price(key),
+            "max_engines": plan["max_engines"],
+            "max_prompts": plan["max_prompts"],
+            "max_brands": plan["max_brands"],
+            "max_competitors": plan["max_competitors"],
+            "daily_scan_limit": plan["daily_scan_limit"],
+            "auto_scan": plan["auto_scan"],
+            "report": plan["report"],
+            "features": plan["features"],
+        })
+    return {"plans": result}
+
+
+@router.post("/api/plans/upgrade")
+async def upgrade_plan(
+    body: PlanUpgradeRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_current_user),
+):
+    """사용자 플랜 변경 (JWT 필수)."""
+    from app.plans import PLANS
+
+    target_plan = body.plan.lower()
+    if target_plan not in PLANS:
+        raise HTTPException(400, f"유효하지 않은 플랜입니다: {body.plan}")
+
+    if target_plan == "enterprise":
+        raise HTTPException(
+            400,
+            "Enterprise 플랜은 별도 문의가 필요합니다. "
+            "hesed@hesedhouse.net으로 연락해 주세요.",
+        )
+
+    old_plan = current_user.plan or "free"
+    current_user.plan = target_plan
+    await session.commit()
+
+    return {
+        "message": f"플랜이 {old_plan} -> {target_plan}으로 변경되었습니다.",
+        "user_id": current_user.id,
+        "old_plan": old_plan,
+        "new_plan": target_plan,
+    }
+
+
+@router.get("/api/plans/my")
+async def my_plan(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_current_user),
+):
+    """현재 사용자의 플랜 + 사용량 반환."""
+    from app.plans import get_plan, format_price
+
+    user_plan_name = current_user.plan or "free"
+    plan = get_plan(user_plan_name)
+
+    # 사용량 집계: 브랜드 수
+    brand_count_result = await session.execute(
+        select(func.count(Brand.id))
+        .join(Client)
+        .where(Client.user_id == current_user.id)
+    )
+    brand_count = brand_count_result.scalar() or 0
+
+    # 사용량 집계: 활성 프롬프트 수 (전체 브랜드 합산)
+    prompt_count_result = await session.execute(
+        select(func.count(ScanPrompt.id))
+        .join(Brand)
+        .join(Client)
+        .where(Client.user_id == current_user.id, ScanPrompt.is_active == True)
+    )
+    prompt_count = prompt_count_result.scalar() or 0
+
+    # 오늘 스캔 횟수
+    today = date.today()
+    scan_count_result = await session.execute(
+        select(func.count(ScanResult.id))
+        .join(ScanPrompt)
+        .join(Brand)
+        .join(Client)
+        .where(
+            Client.user_id == current_user.id,
+            func.date(ScanResult.scanned_at) == today,
+        )
+    )
+    today_scan_count = scan_count_result.scalar() or 0
+
+    return {
+        "plan": user_plan_name,
+        "plan_name": plan["name"],
+        "price_display": format_price(user_plan_name),
+        "limits": {
+            "max_engines": plan["max_engines"],
+            "max_prompts": plan["max_prompts"],
+            "max_brands": plan["max_brands"],
+            "max_competitors": plan["max_competitors"],
+            "daily_scan_limit": plan["daily_scan_limit"],
+            "auto_scan": plan["auto_scan"],
+            "report": plan["report"],
+        },
+        "usage": {
+            "brands": brand_count,
+            "prompts": prompt_count,
+            "today_scans": today_scan_count,
+        },
+    }

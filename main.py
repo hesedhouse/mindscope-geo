@@ -61,6 +61,12 @@ async def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html")
 
 
+@app.get("/pricing", response_class=HTMLResponse)
+async def pricing_page(request: Request):
+    """요금제 페이지."""
+    return templates.TemplateResponse(request, "pricing.html")
+
+
 if __name__ == "__main__":
     import uvicorn
     import os

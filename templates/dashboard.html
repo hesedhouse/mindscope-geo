@@ -34,6 +34,17 @@
                 <option value="">브랜드를 선택하세요</option>
             </select>
             <a href="/setup" class="btn btn-secondary" style="font-size:0.8rem; padding:8px 14px;">설정</a>
+            <a id="planBadge" href="/pricing" style="
+                display:none;
+                font-size:0.68rem;
+                font-weight:800;
+                padding:4px 10px;
+                border-radius:6px;
+                text-decoration:none;
+                margin-left:8px;
+                letter-spacing:0.5px;
+                transition:opacity 0.2s;
+            ">FREE</a>
             <span id="userEmail" style="font-size:0.78rem; color:var(--fog); margin-left:8px;"></span>
             <button id="btnLogout" class="btn btn-secondary" style="font-size:0.75rem; padding:6px 12px; margin-left:4px; display:none;">로그아웃</button>
         </div>
@@ -46,6 +57,34 @@
             <span id="statusText">대시보드 준비 완료</span>
         </div>
         <div id="lastUpdate"></div>
+    </div>
+
+    <!-- Upgrade Banner (shown when plan limits reached) -->
+    <div id="upgradeBanner" style="
+        display:none;
+        background:rgba(198,255,61,0.08);
+        border:1px solid rgba(198,255,61,0.2);
+        border-radius:10px;
+        padding:12px 20px;
+        margin-bottom:16px;
+        font-size:0.85rem;
+        color:#C6FF3D;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+    ">
+        <span id="upgradeBannerText">현재 무료 플랜을 사용 중입니다. 더 많은 기능을 이용하려면 업그레이드하세요.</span>
+        <a href="/pricing" style="
+            background:#C6FF3D;
+            color:#0B0F19;
+            padding:6px 14px;
+            border-radius:6px;
+            font-size:0.78rem;
+            font-weight:700;
+            text-decoration:none;
+            white-space:nowrap;
+            flex-shrink:0;
+        ">업그레이드</a>
     </div>
 
     <!-- No Brand State -->
@@ -228,6 +267,42 @@
         localStorage.removeItem('geo_user');
         window.location.href = '/login';
     });
+
+    // Fetch plan info and display badge
+    var planBadge = document.getElementById('planBadge');
+    var upgradeBanner = document.getElementById('upgradeBanner');
+    fetch('/api/plans/my', {
+        headers: { 'Authorization': 'Bearer ' + token }
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.plan) {
+            var planColors = {
+                free: { bg: 'rgba(160,174,192,0.15)', color: '#A0AEC0' },
+                starter: { bg: 'rgba(198,255,61,0.12)', color: '#C6FF3D' },
+                pro: { bg: 'rgba(255,45,95,0.12)', color: '#FF2D5F' },
+                enterprise: { bg: 'rgba(198,255,61,0.2)', color: '#C6FF3D' },
+            };
+            var pc = planColors[data.plan] || planColors.free;
+            planBadge.textContent = data.plan_name.toUpperCase();
+            planBadge.style.background = pc.bg;
+            planBadge.style.color = pc.color;
+            planBadge.style.display = 'inline-block';
+
+            // Show upgrade banner for free plan
+            if (data.plan === 'free' && upgradeBanner) {
+                upgradeBanner.style.display = 'flex';
+            }
+            // Show banner if nearing limits
+            if (data.usage && data.limits) {
+                var prompts = data.usage.prompts || 0;
+                var maxPrompts = data.limits.max_prompts;
+                if (maxPrompts > 0 && prompts >= maxPrompts * 0.8) {
+                    upgradeBanner.style.display = 'flex';
+                    document.getElementById('upgradeBannerText').textContent =
+                        '프롬프트 사용량이 ' + prompts + '/' + maxPrompts + '개입니다. 제한에 가까워지고 있습니다.';
+                }
+            }
+        }
+    }).catch(function() {});
 })();
 </script>
 <script src="/static/js/dashboard.js"></script>
