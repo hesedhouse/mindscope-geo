@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindScope GEO -- 개인정보 처리방침</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --ink: #0B0F19;
+            --ink-light: #141924;
+            --ink-card: #1A2030;
+            --lime: #C6FF3D;
+            --lime-dim: rgba(198,255,61,0.15);
+            --text: #E2E8F0;
+            --text-bright: #FAFBFC;
+            --fog: #A0AEC0;
+            --border: rgba(255,255,255,0.08);
+            --radius: 16px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--ink);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.7;
+            font-size: 15px;
+        }
+
+        /* Background glow */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -200px;
+            right: -200px;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(198,255,61,0.04) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ---- NAV ---- */
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(11,15,25,0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+        }
+
+        .nav-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--text-bright);
+        }
+
+        .nav-logo-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: var(--lime);
+            color: var(--ink);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 0.9rem;
+        }
+
+        .nav-logo-text {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .nav-logo-text small {
+            display: block;
+            font-size: 0.6rem;
+            font-weight: 400;
+            color: var(--fog);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .nav-link {
+            color: var(--fog);
+            text-decoration: none;
+            font-size: 0.85rem;
+            padding: 6px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .nav-link:hover {
+            color: var(--text-bright);
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        /* ---- MAIN ---- */
+        main {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 48px 24px 80px;
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--text-bright);
+            margin-bottom: 8px;
+            letter-spacing: -0.03em;
+        }
+
+        .subtitle {
+            color: var(--fog);
+            font-size: 0.9rem;
+            margin-bottom: 40px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h2 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-bright);
+            margin-top: 40px;
+            margin-bottom: 16px;
+            padding-left: 14px;
+            border-left: 3px solid var(--lime);
+        }
+
+        h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-top: 24px;
+            margin-bottom: 10px;
+        }
+
+        p {
+            margin-bottom: 12px;
+            color: var(--text);
+        }
+
+        ul, ol {
+            padding-left: 20px;
+            margin-bottom: 12px;
+        }
+
+        li {
+            margin-bottom: 6px;
+        }
+
+        /* Info table */
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0 20px;
+            font-size: 0.9rem;
+        }
+
+        .info-table th,
+        .info-table td {
+            padding: 10px 14px;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+
+        .info-table th {
+            background: var(--ink-card);
+            color: var(--fog);
+            font-weight: 600;
+            white-space: nowrap;
+            width: 160px;
+        }
+
+        .info-table td {
+            background: var(--ink-light);
+            color: var(--text);
+        }
+
+        /* Data collection table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0 20px;
+            font-size: 0.88rem;
+        }
+
+        .data-table thead th {
+            background: var(--ink-card);
+            color: var(--lime);
+            font-weight: 600;
+            padding: 10px 14px;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+
+        .data-table tbody td {
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            background: var(--ink-light);
+            vertical-align: top;
+        }
+
+        .data-table tbody tr:nth-child(even) td {
+            background: var(--ink);
+        }
+
+        .highlight {
+            color: var(--lime);
+            font-weight: 600;
+        }
+
+        .card {
+            background: var(--ink-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin: 16px 0;
+        }
+
+        .card p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* ---- FOOTER ---- */
+        footer {
+            background: var(--ink-light);
+            border-top: 1px solid var(--border);
+            text-align: center;
+            padding: 24px;
+            color: var(--fog);
+            font-size: 0.8rem;
+        }
+
+        footer span {
+            color: var(--text);
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 1.5rem; }
+            main { padding: 32px 16px 60px; }
+            .info-table th { width: 110px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+    <div class="nav-inner">
+        <a href="/" class="nav-logo">
+            <div class="nav-logo-icon">G</div>
+            <div class="nav-logo-text">
+                MindScope GEO
+                <small>AI Visibility Intelligence</small>
+            </div>
+        </a>
+        <a href="/login" class="nav-link">로그인</a>
+    </div>
+</nav>
+
+<!-- MAIN -->
+<main>
+    <h1>개인정보 처리방침</h1>
+    <p class="subtitle">
+        ㈜ 헤세드코퍼레이션(이하 "회사")은 「개인정보 보호법」 제30조에 따라
+        정보주체의 개인정보를 보호하고 이와 관련한 고충을 신속하게 처리할 수 있도록
+        다음과 같이 개인정보 처리방침을 수립·공개합니다.<br>
+        <strong>시행일: 2026년 6월 23일</strong>
+    </p>
+
+    <!-- 제1조 -->
+    <h2>제1조 (개인정보의 처리 목적)</h2>
+    <p>회사는 다음의 목적을 위하여 개인정보를 처리합니다. 처리하는 개인정보는 다음의 목적 이외의 용도로는 이용되지 않으며, 이용 목적이 변경되는 경우에는 「개인정보 보호법」 제18조에 따라 별도의 동의를 받는 등 필요한 조치를 이행할 예정입니다.</p>
+    <ol>
+        <li><strong>회원 가입 및 관리</strong>: 서비스 이용에 따른 본인 식별·인증, 회원자격 유지·관리, 서비스 부정이용 방지</li>
+        <li><strong>AI 가시성 분석 서비스 제공</strong>: 브랜드 AI 노출 스캔, GEO 점수 산출, 경쟁사 비교 분석 등 핵심 서비스 제공</li>
+        <li><strong>진단 결과 및 리포트 발송</strong>: 무료 진단 결과 안내, 정기 리포트 이메일 발송</li>
+        <li><strong>서비스 개선 및 마케팅</strong> (선택 동의): 신규 서비스 안내, 이벤트 정보 제공, 이용 통계 분석을 통한 서비스 품질 개선</li>
+    </ol>
+
+    <!-- 제2조 -->
+    <h2>제2조 (수집하는 개인정보의 항목 및 수집 방법)</h2>
+    <h3>1. 수집 항목</h3>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>구분</th>
+                <th>수집 항목</th>
+                <th>필수/선택</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>회원가입</td>
+                <td>이메일, 비밀번호(암호화 저장), 회사명, 담당자명, 휴대폰번호</td>
+                <td>필수</td>
+            </tr>
+            <tr>
+                <td>소셜 로그인<br>(카카오/네이버)</td>
+                <td>이메일, 닉네임</td>
+                <td>필수</td>
+            </tr>
+            <tr>
+                <td>무료 진단</td>
+                <td>이메일, 이름, 회사명, 휴대폰번호</td>
+                <td>필수</td>
+            </tr>
+            <tr>
+                <td>서비스 이용</td>
+                <td>브랜드명, 키워드, 경쟁사 정보, AI 스캔 결과</td>
+                <td>필수</td>
+            </tr>
+            <tr>
+                <td>자동 수집</td>
+                <td>접속 IP, 쿠키, 접속 일시, 서비스 이용 기록, 기기 정보(OS, 브라우저)</td>
+                <td>자동</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>2. 수집 방법</h3>
+    <ul>
+        <li>홈페이지 회원가입, 무료 진단 신청 폼</li>
+        <li>소셜 로그인(카카오, 네이버) 연동을 통한 제공</li>
+        <li>서비스 이용 과정에서 자동 생성·수집</li>
+    </ul>
+
+    <!-- 제3조 -->
+    <h2>제3조 (개인정보의 처리 및 보유 기간)</h2>
+    <p>회사는 법령에 따른 보유 기간 또는 정보주체로부터 동의받은 기간 내에서 개인정보를 처리·보유합니다.</p>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>구분</th>
+                <th>보유 기간</th>
+                <th>근거</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>회원 정보</td>
+                <td>회원 탈퇴 시까지<br>(탈퇴 후 30일 이내 파기)</td>
+                <td>회원 동의</td>
+            </tr>
+            <tr>
+                <td>계약 또는 청약 철회에 관한 기록</td>
+                <td>5년</td>
+                <td>전자상거래법 제6조</td>
+            </tr>
+            <tr>
+                <td>대금결제 및 재화 공급에 관한 기록</td>
+                <td>5년</td>
+                <td>전자상거래법 제6조</td>
+            </tr>
+            <tr>
+                <td>소비자 불만 또는 분쟁 처리 기록</td>
+                <td>3년</td>
+                <td>전자상거래법 제6조</td>
+            </tr>
+            <tr>
+                <td>접속 로그 기록</td>
+                <td>3개월 이상</td>
+                <td>통신비밀보호법 제15조의2</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- 제4조 -->
+    <h2>제4조 (개인정보의 제3자 제공)</h2>
+    <p>회사는 원칙적으로 정보주체의 개인정보를 제1조에서 명시한 범위 내에서 처리하며, 정보주체의 사전 동의 없이는 본래의 범위를 초과하여 처리하거나 제3자에게 제공하지 않습니다. 다만 다음의 경우에는 예외로 합니다.</p>
+    <ul>
+        <li>정보주체가 사전에 동의한 경우</li>
+        <li>법률에 특별한 규정이 있거나 법령상 의무를 준수하기 위하여 불가피한 경우</li>
+        <li>정보주체 또는 그 법정대리인이 의사표시를 할 수 없는 상태에 있거나 주소불명 등으로 사전 동의를 받을 수 없는 경우로서 명백히 정보주체 또는 제3자의 급박한 생명, 신체, 재산의 이익을 위하여 필요하다고 인정되는 경우</li>
+    </ul>
+
+    <!-- 제5조 -->
+    <h2>제5조 (개인정보 처리의 위탁)</h2>
+    <p>회사는 원활한 서비스 제공을 위해 다음과 같이 개인정보 처리업무를 위탁하고 있습니다.</p>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>수탁업체</th>
+                <th>위탁 업무</th>
+                <th>보유 기간</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Amazon Web Services (AWS)</td>
+                <td>클라우드 서버 운영 및 데이터 저장</td>
+                <td>위탁 계약 종료 시까지</td>
+            </tr>
+            <tr>
+                <td>카카오, 네이버</td>
+                <td>소셜 로그인 연동</td>
+                <td>위탁 계약 종료 시까지</td>
+            </tr>
+        </tbody>
+    </table>
+    <p>위탁 계약 시 개인정보가 안전하게 관리될 수 있도록 필요한 사항을 규정하고 있으며, 변경 사항이 있을 경우 본 방침을 통해 공개합니다.</p>
+
+    <!-- 제6조 -->
+    <h2>제6조 (정보주체의 권리·의무 및 행사 방법)</h2>
+    <p>정보주체는 회사에 대해 언제든지 다음 각 호의 개인정보 보호 관련 권리를 행사할 수 있습니다.</p>
+    <ol>
+        <li>개인정보 열람 요구</li>
+        <li>오류 등이 있을 경우 정정 요구</li>
+        <li>삭제 요구</li>
+        <li>처리 정지 요구</li>
+    </ol>
+    <p>권리 행사는 서비스 내 계정 설정 또는 이메일(<span class="highlight">noah@hesedhouse.net</span>)을 통해 하실 수 있으며, 회사는 이에 대해 지체 없이 조치하겠습니다.</p>
+
+    <!-- 제7조 -->
+    <h2>제7조 (개인정보의 파기 절차 및 방법)</h2>
+    <p>회사는 개인정보 보유기간의 경과, 처리 목적 달성 등 개인정보가 불필요하게 되었을 때에는 지체 없이 해당 개인정보를 파기합니다.</p>
+    <h3>파기 절차</h3>
+    <p>불필요한 개인정보는 개인정보 보호책임자의 승인을 받아 파기합니다.</p>
+    <h3>파기 방법</h3>
+    <ul>
+        <li><strong>전자적 파일</strong>: 복구 및 재생이 불가능한 기술적 방법을 사용하여 안전하게 삭제</li>
+        <li><strong>종이 문서</strong>: 분쇄기로 분쇄하거나 소각하여 파기</li>
+    </ul>
+
+    <!-- 제8조 -->
+    <h2>제8조 (개인정보의 안전성 확보 조치)</h2>
+    <p>회사는 개인정보의 안전성 확보를 위해 다음과 같은 조치를 취하고 있습니다.</p>
+    <ol>
+        <li><strong>비밀번호 암호화</strong>: 비밀번호는 bcrypt 등 일방향 암호화하여 저장·관리</li>
+        <li><strong>해킹 등에 대비한 기술적 대책</strong>: SSL/TLS 암호화 통신, 방화벽 운영, 침입 탐지 시스템 가동</li>
+        <li><strong>접근 권한 관리</strong>: 개인정보 처리 담당자를 최소한으로 제한하고 정기적으로 접근 권한을 검토</li>
+        <li><strong>개인정보 접속 기록 보관</strong>: 개인정보 처리시스템에 대한 접속 기록을 최소 1년 이상 보관·관리</li>
+    </ol>
+
+    <!-- 제9조 -->
+    <h2>제9조 (쿠키의 설치·운영 및 거부에 관한 사항)</h2>
+    <p>회사는 이용자에게 개별적인 맞춤 서비스를 제공하기 위해 쿠키(cookie)를 사용합니다.</p>
+    <h3>쿠키의 사용 목적</h3>
+    <ul>
+        <li>로그인 상태 유지 및 세션 관리</li>
+        <li>서비스 이용 패턴 분석을 통한 서비스 개선</li>
+    </ul>
+    <h3>쿠키의 설치·운영 및 거부</h3>
+    <p>이용자는 웹 브라우저의 옵션 설정을 통해 쿠키 허용, 차단 등의 설정을 할 수 있습니다. 다만, 쿠키 저장을 거부할 경우 로그인이 필요한 일부 서비스 이용에 어려움이 발생할 수 있습니다.</p>
+
+    <!-- 제10조 -->
+    <h2>제10조 (개인정보 보호책임자)</h2>
+    <p>회사는 개인정보 처리에 관한 업무를 총괄해서 책임지고, 개인정보 처리와 관련한 정보주체의 불만 처리 및 피해구제 등을 위하여 아래와 같이 개인정보 보호책임자를 지정하고 있습니다.</p>
+    <div class="card">
+        <table class="info-table" style="margin:0;">
+            <tr><th>개인정보 보호책임자</th><td>이현우 (대표이사)</td></tr>
+            <tr><th>이메일</th><td><span class="highlight">noah@hesedhouse.net</span></td></tr>
+            <tr><th>전화</th><td>031-994-7740</td></tr>
+        </table>
+    </div>
+    <p>정보주체는 서비스를 이용하면서 발생한 모든 개인정보 보호 관련 문의, 불만 처리, 피해구제 등에 관한 사항을 개인정보 보호책임자에게 문의하실 수 있습니다. 회사는 정보주체의 문의에 대해 지체 없이 답변 및 처리해드리겠습니다.</p>
+
+    <!-- 제11조 -->
+    <h2>제11조 (권익 침해 구제 방법)</h2>
+    <p>정보주체는 개인정보 침해로 인한 구제를 받기 위하여 아래의 기관에 분쟁 해결이나 상담 등을 신청할 수 있습니다.</p>
+    <table class="info-table">
+        <tr><th>개인정보 분쟁조정위원회</th><td>1833-6972 &nbsp;|&nbsp; <a href="https://www.kopico.go.kr" style="color:var(--lime);" target="_blank">www.kopico.go.kr</a></td></tr>
+        <tr><th>개인정보 침해신고센터</th><td>(국번없이) 118 &nbsp;|&nbsp; <a href="https://privacy.kisa.or.kr" style="color:var(--lime);" target="_blank">privacy.kisa.or.kr</a></td></tr>
+        <tr><th>대검찰청 사이버수사과</th><td>(국번없이) 1301 &nbsp;|&nbsp; <a href="https://www.spo.go.kr" style="color:var(--lime);" target="_blank">www.spo.go.kr</a></td></tr>
+        <tr><th>경찰청 사이버수사국</th><td>(국번없이) 182 &nbsp;|&nbsp; <a href="https://ecrm.cyber.go.kr" style="color:var(--lime);" target="_blank">ecrm.cyber.go.kr</a></td></tr>
+    </table>
+
+    <!-- 제12조 -->
+    <h2>제12조 (개인정보 처리방침 변경)</h2>
+    <p>이 개인정보 처리방침은 2026년 6월 23일부터 적용됩니다. 변경 사항이 있을 경우 시행일 7일 전부터 서비스 내 공지사항을 통해 고지할 것입니다.</p>
+    <div class="card">
+        <p><strong>현행 개인정보 처리방침 버전:</strong> v1.0</p>
+        <p><strong>시행일:</strong> 2026년 6월 23일</p>
+    </div>
+
+    <!-- 사업자 정보 -->
+    <h2>운영사 정보</h2>
+    <table class="info-table">
+        <tr><th>법인명</th><td>㈜ 헤세드코퍼레이션 (HESED CORP.)</td></tr>
+        <tr><th>대표자</th><td>이현우</td></tr>
+        <tr><th>사업자등록번호</th><td>102-81-48503</td></tr>
+        <tr><th>주소</th><td>경기도 고양시 일산서구 덕이로 24, B103호</td></tr>
+        <tr><th>연락처</th><td>031-994-7740</td></tr>
+        <tr><th>이메일</th><td>hesed@hesedhouse.net</td></tr>
+    </table>
+</main>
+
+<!-- FOOTER -->
+<footer>
+    <p>&copy; 2026 <span>㈜ 헤세드코퍼레이션</span> &middot; HESED CORP. All rights reserved.</p>
+</footer>
+
+</body>
+</html>

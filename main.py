@@ -67,6 +67,12 @@ async def pricing_page(request: Request):
     return templates.TemplateResponse(request, "pricing.html")
 
 
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request):
+    """개인정보 처리방침."""
+    return templates.TemplateResponse(request, "privacy.html")
+
+
 @app.get("/diagnose", response_class=HTMLResponse)
 async def diagnose_page(request: Request):
     """무료 AI 가시성 진단 페이지."""
