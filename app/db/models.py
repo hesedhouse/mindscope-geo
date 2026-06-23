@@ -15,7 +15,9 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     email = Column(String(320), unique=True, nullable=False, index=True)
-    hashed_password = Column(String(512), nullable=False)
+    hashed_password = Column(String(512), nullable=True)  # nullable for social login
+    provider = Column(String(20), default="email")  # email, kakao, naver
+    provider_id = Column(String(200), nullable=True)  # 소셜 로그인 고유 ID
     company_name = Column(String(200), nullable=True)
     name = Column(String(100), nullable=True)
     phone = Column(String(20), nullable=True)

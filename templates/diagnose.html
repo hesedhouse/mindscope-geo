@@ -263,6 +263,25 @@ a{color:inherit;text-decoration:none}
 
       <div style="border-top:1px solid rgba(255,255,255,0.1);margin:28px 0 24px"></div>
 
+      <div class="social-quick" id="diagSocialQuick">
+        <p style="font-size:14px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:12px;text-align:center">간편하게 시작하기</p>
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <a href="/api/auth/kakao?next=/diagnose" class="social-btn-diag kakao" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:12px;background:#FEE500;color:#191919;font-size:14px;font-weight:700;text-decoration:none;transition:opacity .2s">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px"><path d="M12 3C6.48 3 2 6.36 2 10.5c0 2.67 1.74 5.01 4.36 6.36-.14.53-.92 3.4-.95 3.6 0 0-.02.16.08.22.1.06.22.03.22.03.29-.04 3.38-2.22 3.92-2.6.76.11 1.55.17 2.37.17 5.52 0 10-3.36 10-7.5S17.52 3 12 3z"/></svg>
+            카카오로 시작
+          </a>
+          <a href="/api/auth/naver?next=/diagnose" class="social-btn-diag naver" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:12px;background:#03C75A;color:#fff;font-size:14px;font-weight:700;text-decoration:none;transition:opacity .2s">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px"><path d="M16.27 10.84L7.43 4H4v16h3.73V13.16L16.57 20H20V4h-3.73z"/></svg>
+            네이버로 시작
+          </a>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+          <div style="flex:1;height:1px;background:rgba(255,255,255,0.1)"></div>
+          <span style="font-size:12px;color:rgba(255,255,255,0.35);white-space:nowrap">또는 직접 입력</span>
+          <div style="flex:1;height:1px;background:rgba(255,255,255,0.1)"></div>
+        </div>
+      </div>
+
       <div class="form-group">
         <label class="form-label">회사명 <span class="req">*</span></label>
         <input class="form-input" id="diagCompany" type="text" placeholder="예: 아모레퍼시픽" required>
@@ -408,6 +427,53 @@ a{color:inherit;text-decoration:none}
 <script>
 var _currentRequestId = null;
 var _currentRequestBody = null;
+
+// Social login callback: auto-fill user info from token
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var token = params.get('token');
+  if (token) {
+    localStorage.setItem('geo_token', token);
+    var userStr = params.get('user');
+    if (userStr) {
+      try {
+        var userObj = JSON.parse(decodeURIComponent(userStr));
+        localStorage.setItem('geo_user', JSON.stringify(userObj));
+        // Auto-fill fields
+        if (userObj.name) document.getElementById('diagName').value = userObj.name;
+        if (userObj.email) document.getElementById('diagEmail').value = userObj.email;
+        if (userObj.phone) document.getElementById('diagPhone').value = userObj.phone;
+        if (userObj.company_name) document.getElementById('diagCompany').value = userObj.company_name;
+      } catch(e) {}
+    }
+    // Clean URL
+    window.history.replaceState({}, document.title, '/diagnose');
+  }
+})();
+
+// Hide social buttons if providers not configured
+(function() {
+  ['kakao', 'naver'].forEach(function(provider) {
+    fetch('/api/auth/' + provider, { method: 'HEAD', redirect: 'manual' })
+      .then(function(resp) {
+        if (resp.status === 501) {
+          document.querySelectorAll('.social-btn-diag.' + provider).forEach(function(el) {
+            el.style.display = 'none';
+          });
+          setTimeout(function() {
+            var allBtns = document.querySelectorAll('.social-btn-diag');
+            var allHidden = true;
+            allBtns.forEach(function(b) { if (b.style.display !== 'none') allHidden = false; });
+            if (allHidden) {
+              var sq = document.getElementById('diagSocialQuick');
+              if (sq) sq.style.display = 'none';
+            }
+          }, 100);
+        }
+      })
+      .catch(function() {});
+  });
+})();
 
 function showStep(id){
   document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));

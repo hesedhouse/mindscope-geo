@@ -181,6 +181,70 @@
         .panel { display: none; }
         .panel.active { display: block; }
 
+        /* Social login */
+        .social-login {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .social-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+
+        .social-btn:hover { opacity: 0.9; }
+        .social-btn:active { transform: scale(0.98); }
+
+        .social-btn.kakao {
+            background: #FEE500;
+            color: #191919;
+        }
+
+        .social-btn.naver {
+            background: #03C75A;
+            color: #FFFFFF;
+        }
+
+        .social-btn svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .divider span {
+            font-size: 0.78rem;
+            color: var(--fog);
+            white-space: nowrap;
+        }
+
         .footer-text {
             text-align: center;
             margin-top: 24px;
@@ -231,6 +295,17 @@
 
         <!-- Login Panel -->
         <div id="loginPanel" class="panel active">
+            <div class="social-login" id="socialLoginBtns">
+                <a href="/api/auth/kakao" class="social-btn kakao">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.48 3 2 6.36 2 10.5c0 2.67 1.74 5.01 4.36 6.36-.14.53-.92 3.4-.95 3.6 0 0-.02.16.08.22.1.06.22.03.22.03.29-.04 3.38-2.22 3.92-2.6.76.11 1.55.17 2.37.17 5.52 0 10-3.36 10-7.5S17.52 3 12 3z"/></svg>
+                    카카오로 시작하기
+                </a>
+                <a href="/api/auth/naver" class="social-btn naver">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.27 10.84L7.43 4H4v16h3.73V13.16L16.57 20H20V4h-3.73z"/></svg>
+                    네이버로 시작하기
+                </a>
+            </div>
+            <div class="divider" id="socialLoginDivider"><span>또는 이메일로 로그인</span></div>
             <form id="loginForm" onsubmit="return false;">
                 <div class="form-group">
                     <label class="form-label">이메일</label>
@@ -249,6 +324,17 @@
 
         <!-- Register Panel -->
         <div id="registerPanel" class="panel">
+            <div class="social-login" id="socialRegBtns">
+                <a href="/api/auth/kakao" class="social-btn kakao">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.48 3 2 6.36 2 10.5c0 2.67 1.74 5.01 4.36 6.36-.14.53-.92 3.4-.95 3.6 0 0-.02.16.08.22.1.06.22.03.22.03.29-.04 3.38-2.22 3.92-2.6.76.11 1.55.17 2.37.17 5.52 0 10-3.36 10-7.5S17.52 3 12 3z"/></svg>
+                    카카오로 시작하기
+                </a>
+                <a href="/api/auth/naver" class="social-btn naver">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.27 10.84L7.43 4H4v16h3.73V13.16L16.57 20H20V4h-3.73z"/></svg>
+                    네이버로 시작하기
+                </a>
+            </div>
+            <div class="divider" id="socialRegDivider"><span>또는 이메일로 회원가입</span></div>
             <form id="registerForm" onsubmit="return false;">
                 <div class="form-group">
                     <label class="form-label">회사명</label>
@@ -288,6 +374,27 @@
 
 <script>
 // ---------------------------------------------------------------------------
+// Social login callback handling
+// ---------------------------------------------------------------------------
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var token = params.get('token');
+    if (token) {
+        localStorage.setItem('geo_token', token);
+        var userStr = params.get('user');
+        if (userStr) {
+            try {
+                var userObj = JSON.parse(decodeURIComponent(userStr));
+                localStorage.setItem('geo_user', JSON.stringify(userObj));
+            } catch(e) {}
+        }
+        var next = params.get('next');
+        window.location.href = next || '/';
+        return;
+    }
+})();
+
+// ---------------------------------------------------------------------------
 // Tab switching
 // ---------------------------------------------------------------------------
 document.querySelectorAll('.tab').forEach(tab => {
@@ -305,6 +412,49 @@ document.querySelectorAll('.tab').forEach(tab => {
 if (localStorage.getItem('geo_token')) {
     window.location.href = '/';
 }
+
+// ---------------------------------------------------------------------------
+// Hide social buttons if provider not configured (check via HEAD)
+// ---------------------------------------------------------------------------
+(function() {
+    function checkSocial(provider) {
+        fetch('/api/auth/' + provider, { method: 'GET', redirect: 'manual' })
+            .then(function(resp) {
+                // 302 = redirect to provider (configured), 501 = not configured
+                if (resp.status === 501 || resp.type === 'opaqueredirect') {
+                    // opaqueredirect means it worked; 501 means not configured
+                }
+            })
+            .catch(function() {});
+    }
+    // We'll use a simple approach: try fetching the endpoint.
+    // If it returns 501, hide the buttons. If it redirects (302), it's configured.
+    ['kakao', 'naver'].forEach(function(provider) {
+        fetch('/api/auth/' + provider, { method: 'HEAD', redirect: 'manual' })
+            .then(function(resp) {
+                // status 0 with opaqueredirect means redirect happened (configured)
+                // status 501 means not configured
+                if (resp.status === 501) {
+                    // Hide this provider's buttons
+                    document.querySelectorAll('.social-btn.' + provider).forEach(function(el) {
+                        el.style.display = 'none';
+                    });
+                    // If both hidden, hide dividers too
+                    setTimeout(function() {
+                        var allBtns = document.querySelectorAll('.social-btn');
+                        var allHidden = true;
+                        allBtns.forEach(function(b) { if (b.style.display !== 'none') allHidden = false; });
+                        if (allHidden) {
+                            document.querySelectorAll('.social-login, .divider').forEach(function(el) {
+                                el.style.display = 'none';
+                            });
+                        }
+                    }, 100);
+                }
+            })
+            .catch(function() {});
+    });
+})();
 
 // ---------------------------------------------------------------------------
 // Login

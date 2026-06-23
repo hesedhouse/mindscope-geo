@@ -13,6 +13,15 @@ JWT_SECRET: str = os.getenv("JWT_SECRET", os.urandom(32).hex())
 JWT_ALGORITHM: str = "HS256"
 JWT_EXPIRE_HOURS: int = 24
 
+# Social Login
+KAKAO_CLIENT_ID: str = os.getenv("KAKAO_CLIENT_ID", "")
+KAKAO_CLIENT_SECRET: str = os.getenv("KAKAO_CLIENT_SECRET", "")
+NAVER_CLIENT_ID: str = os.getenv("NAVER_CLIENT_ID", "")
+NAVER_CLIENT_SECRET: str = os.getenv("NAVER_CLIENT_SECRET", "")
+
+# 서비스 베이스 URL (OAuth callback에 사용)
+BASE_URL: str = os.getenv("BASE_URL", "https://geo.mindscopekorea.com")
+
 DATABASE_URL: str = os.getenv(
     "DATABASE_URL",
     f"sqlite+aiosqlite:///{Path(__file__).resolve().parent.parent / 'mindscope_geo.db'}",
