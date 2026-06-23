@@ -864,3 +864,234 @@ async def my_plan(
             "today_scans": today_scan_count,
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Free Diagnosis (no auth required)
+# ---------------------------------------------------------------------------
+
+class DiagnoseRequest(BaseModel):
+    brand_name: str
+    keywords: list[str]
+    competitors: list[str] = []
+
+
+# Simple in-memory cache for rate limiting: {brand_name_lower: (timestamp, result)}
+_diagnose_cache: dict[str, tuple[float, dict]] = {}
+_CACHE_TTL = 600  # 10 minutes
+
+
+@router.post("/api/diagnose")
+async def run_diagnosis(body: DiagnoseRequest):
+    """고객용 무료 AI 가시성 진단 — 인증 불필요."""
+    import time as _time
+
+    brand = body.brand_name.strip()
+    if not brand:
+        raise HTTPException(400, "브랜드명을 입력해주세요.")
+    if not body.keywords:
+        raise HTTPException(400, "키워드를 1개 이상 입력해주세요.")
+
+    cache_key = brand.lower()
+    now = _time.time()
+
+    # Rate limit: 같은 brand_name으로 10분 내 재요청 시 캐시 반환
+    if cache_key in _diagnose_cache:
+        cached_ts, cached_result = _diagnose_cache[cache_key]
+        if now - cached_ts < _CACHE_TTL:
+            logger.info("진단 캐시 히트: %s", brand)
+            return cached_result
+
+    # 프롬프트 자동 생성 (키워드 기반 3개)
+    prompts: list[str] = []
+    for kw in body.keywords[:5]:
+        prompts.append(f"{kw} 추천해줘")
+        prompts.append(f"좋은 {kw} 브랜드")
+        prompts.append(f"{kw} 순위")
+
+    # 엔진 인스턴스
+    engines = _get_enabled_engines()
+    if not engines:
+        raise HTTPException(
+            503,
+            "현재 AI 엔진이 비활성 상태입니다. 잠시 후 다시 시도해주세요.",
+        )
+
+    brand_lower = brand.lower()
+    competitor_names = [c.strip().lower() for c in body.competitors if c.strip()]
+
+    raw_results: list[dict] = []
+    engine_mention_counts: dict[str, dict] = {}  # engine -> {total, mentioned}
+    all_mention_counts: dict[str, int] = {brand: 0}
+    for comp in body.competitors:
+        if comp.strip():
+            all_mention_counts[comp.strip()] = 0
+
+    sentiment_scores: list[float] = []
+
+    for prompt_text in prompts:
+        for engine in engines:
+            try:
+                resp = await engine.query(prompt_text)
+                resp_lower = resp.response_text.lower()
+
+                mentioned = brand_lower in resp_lower
+
+                # Engine stats
+                if engine.name not in engine_mention_counts:
+                    engine_mention_counts[engine.name] = {"total": 0, "mentioned": 0}
+                engine_mention_counts[engine.name]["total"] += 1
+                if mentioned:
+                    engine_mention_counts[engine.name]["mentioned"] += 1
+                    all_mention_counts[brand] = all_mention_counts.get(brand, 0) + 1
+
+                # Competitor mentions
+                for comp in body.competitors:
+                    comp_clean = comp.strip()
+                    if comp_clean and comp_clean.lower() in resp_lower:
+                        all_mention_counts[comp_clean] = all_mention_counts.get(comp_clean, 0) + 1
+
+                # Sentiment
+                sent = _estimate_sentiment(resp.response_text, brand)
+                sentiment_scores.append(sent)
+
+                raw_results.append({
+                    "prompt": prompt_text,
+                    "engine": engine.name,
+                    "mentioned": mentioned,
+                })
+            except Exception as e:
+                logger.warning("진단 스캔 실패 [%s / %s]: %s", engine.name, prompt_text[:30], e)
+                raw_results.append({
+                    "prompt": prompt_text,
+                    "engine": engine.name,
+                    "mentioned": False,
+                    "error": str(e),
+                })
+
+    # Score calculation
+    total_queries = sum(ec["total"] for ec in engine_mention_counts.values())
+    total_mentioned = sum(ec["mentioned"] for ec in engine_mention_counts.values())
+
+    visibility = (total_mentioned / total_queries * 100) if total_queries > 0 else 0
+
+    # SOV
+    total_all_mentions = sum(all_mention_counts.values())
+    sov_score = (all_mention_counts.get(brand, 0) / total_all_mentions * 100) if total_all_mentions > 0 else 0
+    sov_dict: dict[str, int] = {}
+    for name, cnt in all_mention_counts.items():
+        sov_dict[name] = round((cnt / total_all_mentions * 100), 1) if total_all_mentions > 0 else 0
+
+    # Sentiment
+    avg_sentiment = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores else 0
+
+    # Overall
+    overall = round(visibility * 0.5 + sov_score * 0.3 + (avg_sentiment + 1) * 50 * 0.2, 1)
+    overall = max(0, min(100, overall))
+
+    # Engine scores
+    engine_scores: dict[str, int] = {}
+    for eng_name, counts in engine_mention_counts.items():
+        eng_score = round(counts["mentioned"] / counts["total"] * 100) if counts["total"] > 0 else 0
+        engine_scores[eng_name] = eng_score
+
+    # Grade
+    if overall <= 20:
+        grade = "매우 낮음"
+    elif overall <= 40:
+        grade = "낮음"
+    elif overall <= 60:
+        grade = "보통"
+    elif overall <= 80:
+        grade = "높음"
+    else:
+        grade = "매우 높음"
+
+    # Projected score
+    projected = round(min(overall * 2.5, 85))
+    if overall == 0:
+        projected = 35
+
+    # Improvements
+    improvements = _generate_diagnosis_improvements(overall, sov_score, avg_sentiment, visibility)
+
+    result = {
+        "brand_name": brand,
+        "overall_score": round(overall),
+        "grade": grade,
+        "engine_scores": engine_scores,
+        "sov": sov_dict,
+        "sentiment": round(avg_sentiment, 2),
+        "projected_score": projected,
+        "improvements": improvements,
+        "raw_results": raw_results,
+    }
+
+    # Cache
+    _diagnose_cache[cache_key] = (now, result)
+
+    # Cleanup old cache entries
+    expired = [k for k, (ts, _) in _diagnose_cache.items() if now - ts > _CACHE_TTL]
+    for k in expired:
+        _diagnose_cache.pop(k, None)
+
+    return result
+
+
+def _generate_diagnosis_improvements(
+    overall: float, sov: float, sentiment: float, visibility: float,
+) -> list[dict]:
+    """진단 결과에 따른 개선 포인트 3개 자동 생성."""
+    pool: list[dict] = []
+
+    if visibility < 40:
+        pool.append({
+            "icon": "\U0001f527",
+            "title": "FAQ 구조 최적화",
+            "desc": "AI가 인용하기 쉬운 FAQ 형태로 웹사이트 콘텐츠를 재구성하세요. 질문-답변 구조는 AI 답변 인용률을 크게 높입니다.",
+        })
+        pool.append({
+            "icon": "\U0001f4dd",
+            "title": "구조화 데이터(Schema) 적용",
+            "desc": "제품, 리뷰, FAQ 등의 Schema Markup을 웹사이트에 추가하면 AI가 브랜드 정보를 정확하게 이해하고 인용합니다.",
+        })
+
+    if sov < 30:
+        pool.append({
+            "icon": "\u2694\ufe0f",
+            "title": "경쟁사 대비 콘텐츠 갭 해소",
+            "desc": "경쟁사가 AI에서 더 많이 언급되고 있습니다. 차별화된 브랜드 스토리와 전문 콘텐츠를 강화하세요.",
+        })
+
+    pool.append({
+        "icon": "\U0001f916",
+        "title": "AI 크롤러 접근성 개선",
+        "desc": "AI 엔진이 웹사이트 콘텐츠를 크롤링할 수 있도록 robots.txt, sitemap을 최적화하고 JavaScript 렌더링 의존도를 줄이세요.",
+    })
+    pool.append({
+        "icon": "\u2b50",
+        "title": "브랜드 권위 시그널 강화",
+        "desc": "업계 전문 매체 기고, 리뷰 사이트 평점, 위키 등록 등 제3자 권위 시그널을 확보하면 AI의 브랜드 추천 확률이 높아집니다.",
+    })
+
+    if sentiment < 0.3:
+        pool.append({
+            "icon": "\U0001f4ac",
+            "title": "긍정 리뷰/콘텐츠 확대",
+            "desc": "AI는 긍정적 맥락에서 언급된 브랜드를 더 자주 추천합니다. 고객 후기, 수상 이력, 전문가 추천 콘텐츠를 늘리세요.",
+        })
+
+    pool.append({
+        "icon": "\U0001f4ca",
+        "title": "통계/데이터 기반 콘텐츠 제작",
+        "desc": "AI는 구체적 수치와 통계가 포함된 콘텐츠를 인용하는 경향이 있습니다. 자체 리서치, 설문 결과 등을 공개하세요.",
+    })
+
+    # Return top 3, avoiding duplicates
+    seen: set[str] = set()
+    result: list[dict] = []
+    for item in pool:
+        if item["title"] not in seen and len(result) < 3:
+            seen.add(item["title"])
+            result.append(item)
+    return result

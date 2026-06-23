@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>무료 AI 가시성 진단 — MindScope GEO</title>
+<meta name="description" content="AI가 당신의 브랜드를 추천하고 있을까요? 무료로 ChatGPT, Gemini에서 브랜드 가시성을 진단하세요.">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+  background:#0B0F19;color:#fff;line-height:1.6;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none}
+
+/* Layout */
+.wrap{max-width:800px;margin:0 auto;padding:0 20px}
+
+/* Steps */
+.step{display:none;min-height:100vh;padding:60px 0}
+.step.active{display:flex;flex-direction:column;justify-content:center;align-items:center}
+
+/* --- STEP 1: INPUT --- */
+.step-input .headline{
+  font-size:clamp(28px,4.5vw,48px);font-weight:900;text-align:center;
+  line-height:1.2;letter-spacing:-1.5px;margin-bottom:12px;
+}
+.step-input .headline .lime{color:#C6FF3D}
+.step-input .sub{
+  font-size:17px;color:rgba(255,255,255,0.55);text-align:center;max-width:560px;margin-bottom:48px;
+}
+.form-card{
+  width:100%;max-width:520px;
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
+  border-radius:20px;padding:36px 32px;
+}
+.form-group{margin-bottom:24px}
+.form-label{
+  display:block;font-size:14px;font-weight:700;margin-bottom:8px;color:rgba(255,255,255,0.85);
+}
+.form-label .req{color:#FF2D5F;margin-left:2px}
+.form-label .opt{color:rgba(255,255,255,0.35);font-weight:400;font-size:12px;margin-left:6px}
+.form-input{
+  width:100%;padding:14px 16px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);
+  background:rgba(255,255,255,0.06);color:#fff;font-size:15px;outline:none;
+  transition:border-color .2s;
+}
+.form-input::placeholder{color:rgba(255,255,255,0.3)}
+.form-input:focus{border-color:#C6FF3D}
+.form-hint{font-size:12px;color:rgba(255,255,255,0.35);margin-top:6px}
+.btn-diagnose{
+  width:100%;padding:18px;border:none;border-radius:999px;
+  background:#C6FF3D;color:#0B0F19;font-size:17px;font-weight:900;
+  cursor:pointer;transition:transform .15s,box-shadow .15s;
+  box-shadow:0 8px 30px rgba(198,255,61,0.25);
+}
+.btn-diagnose:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(198,255,61,0.35)}
+.btn-diagnose:disabled{opacity:0.5;cursor:not-allowed;transform:none;box-shadow:none}
+.form-footer{
+  text-align:center;margin-top:20px;font-size:13px;color:rgba(255,255,255,0.35);
+}
+.form-footer span{margin:0 8px}
+
+/* --- STEP 2: LOADING --- */
+.step-loading{text-align:center}
+.loading-title{font-size:28px;font-weight:900;margin-bottom:40px}
+.loading-steps{text-align:left;max-width:360px;width:100%}
+.loading-step{
+  display:flex;align-items:center;gap:14px;padding:14px 0;
+  font-size:15px;color:rgba(255,255,255,0.35);transition:color .4s;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.loading-step.active{color:rgba(255,255,255,0.85)}
+.loading-step.done{color:#C6FF3D}
+.loading-step .icon{
+  width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:14px;border:2px solid rgba(255,255,255,0.15);transition:all .4s;flex-shrink:0;
+}
+.loading-step.active .icon{border-color:rgba(255,255,255,0.5)}
+.loading-step.done .icon{border-color:#C6FF3D;background:rgba(198,255,61,0.15);color:#C6FF3D}
+.loading-spinner{
+  width:48px;height:48px;border:3px solid rgba(255,255,255,0.1);
+  border-top-color:#C6FF3D;border-radius:50%;animation:spin 1s linear infinite;
+  margin:0 auto 24px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-sub{font-size:14px;color:rgba(255,255,255,0.4);margin-top:24px}
+
+/* --- STEP 3: RESULTS --- */
+.step-result{padding-top:40px;padding-bottom:80px}
+.result-header{text-align:center;margin-bottom:48px}
+.result-header h2{font-size:14px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.brand-name-display{font-size:clamp(24px,3.5vw,36px);font-weight:900;margin-bottom:4px}
+
+/* Score gauge */
+.gauge-wrap{display:flex;justify-content:center;margin-bottom:48px}
+.gauge{
+  position:relative;width:220px;height:220px;
+}
+.gauge svg{width:100%;height:100%;transform:rotate(-90deg)}
+.gauge-bg{fill:none;stroke:rgba(255,255,255,0.08);stroke-width:12}
+.gauge-fill{
+  fill:none;stroke-width:12;stroke-linecap:round;
+  transition:stroke-dashoffset 1.5s ease,stroke .5s;
+}
+.gauge-center{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+}
+.gauge-score{font-size:56px;font-weight:900;line-height:1}
+.gauge-label{font-size:14px;color:rgba(255,255,255,0.5);margin-top:4px}
+.gauge-grade{
+  font-size:15px;font-weight:800;margin-top:8px;padding:4px 16px;
+  border-radius:999px;
+}
+.grade-very-low{background:rgba(255,45,95,0.15);color:#FF2D5F}
+.grade-low{background:rgba(255,165,0,0.15);color:#FFA500}
+.grade-medium{background:rgba(255,220,0,0.15);color:#FFDC00}
+.grade-high{background:rgba(198,255,61,0.15);color:#C6FF3D}
+.grade-very-high{background:rgba(0,230,118,0.15);color:#00E676}
+
+/* Engine cards */
+.engines-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:48px;max-width:520px;width:100%}
+.engine-card{
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
+  border-radius:16px;padding:24px 20px;text-align:center;
+}
+.engine-card .name{font-size:16px;font-weight:800;margin-bottom:4px}
+.engine-card .score{font-size:36px;font-weight:900;margin-bottom:12px}
+.engine-bar-wrap{
+  height:8px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;
+}
+.engine-bar{height:100%;border-radius:4px;transition:width 1.5s ease}
+
+/* SOV comparison */
+.sov-section{margin-bottom:48px;width:100%;max-width:520px}
+.sov-title{font-size:16px;font-weight:800;margin-bottom:20px}
+.sov-item{margin-bottom:14px}
+.sov-meta{display:flex;justify-content:space-between;margin-bottom:6px;font-size:14px}
+.sov-name{font-weight:700}
+.sov-pct{font-weight:800}
+.sov-bar-wrap{height:10px;background:rgba(255,255,255,0.08);border-radius:5px;overflow:hidden}
+.sov-bar{height:100%;border-radius:5px;transition:width 1.5s ease}
+.sov-bar.mine{background:#C6FF3D}
+.sov-bar.comp{background:rgba(255,255,255,0.3)}
+
+/* Projected score */
+.projected{
+  width:100%;max-width:520px;
+  background:rgba(198,255,61,0.06);border:1px solid rgba(198,255,61,0.15);
+  border-radius:20px;padding:32px;text-align:center;margin-bottom:48px;
+}
+.projected-label{font-size:14px;color:rgba(255,255,255,0.5);margin-bottom:12px}
+.projected-scores{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px}
+.projected-current{font-size:32px;font-weight:900;color:rgba(255,255,255,0.4)}
+.projected-arrow{font-size:24px;color:#C6FF3D;animation:arrowBounce 1.5s ease infinite}
+@keyframes arrowBounce{0%,100%{transform:translateX(0)}50%{transform:translateX(6px)}}
+.projected-future{font-size:48px;font-weight:900;color:#C6FF3D}
+.projected-desc{font-size:14px;color:rgba(255,255,255,0.55);line-height:1.6;max-width:420px;margin:0 auto}
+
+/* Improvements */
+.improvements{
+  display:grid;grid-template-columns:1fr;gap:16px;
+  width:100%;max-width:520px;margin-bottom:56px;
+}
+.improve-card{
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
+  border-radius:16px;padding:24px;display:flex;gap:16px;align-items:flex-start;
+}
+.improve-icon{font-size:28px;flex-shrink:0;line-height:1}
+.improve-title{font-size:16px;font-weight:800;margin-bottom:4px}
+.improve-desc{font-size:14px;color:rgba(255,255,255,0.55);line-height:1.5}
+
+/* CTA */
+.cta-section{text-align:center;width:100%;max-width:520px}
+.cta-section h3{font-size:24px;font-weight:900;margin-bottom:8px}
+.cta-section .cta-sub{font-size:14px;color:rgba(255,255,255,0.45);margin-bottom:28px}
+.btn-cta-primary{
+  display:inline-block;padding:16px 36px;border-radius:999px;
+  background:#C6FF3D;color:#0B0F19;font-size:16px;font-weight:900;
+  box-shadow:0 8px 30px rgba(198,255,61,0.25);transition:transform .15s;
+  margin-bottom:12px;
+}
+.btn-cta-primary:hover{transform:translateY(-2px)}
+.btn-cta-secondary{
+  display:inline-block;padding:14px 28px;border-radius:999px;
+  background:rgba(255,255,255,0.08);color:#fff;font-size:14px;font-weight:700;
+  border:1px solid rgba(255,255,255,0.15);transition:transform .15s;
+  margin-left:12px;
+}
+.btn-cta-secondary:hover{transform:translateY(-2px)}
+.cta-retry{
+  display:inline-block;margin-top:20px;font-size:13px;color:rgba(255,255,255,0.4);
+  cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.2);
+}
+.cta-retry:hover{color:rgba(255,255,255,0.7)}
+
+/* Error */
+.error-msg{
+  background:rgba(255,45,95,0.12);border:1px solid rgba(255,45,95,0.3);
+  border-radius:12px;padding:16px;margin-top:16px;font-size:14px;color:#FF2D5F;
+  text-align:center;display:none;
+}
+
+/* Nav mini */
+.mini-nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  padding:16px 24px;display:flex;justify-content:space-between;align-items:center;
+  background:rgba(11,15,25,0.85);backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.mini-brand{font-size:16px;font-weight:900;display:flex;align-items:center;gap:8px}
+.mini-dot{width:14px;height:14px;background:#C6FF3D;border-radius:50%;position:relative;box-shadow:0 0 10px rgba(198,255,61,0.4)}
+.mini-dot::after{content:'';position:absolute;inset:3px;border-radius:50%;background:#0B0F19}
+.mini-brand small{font-weight:600;color:rgba(255,255,255,0.4);font-size:11px;margin-left:4px}
+.mini-nav-link{font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);transition:color .15s}
+.mini-nav-link:hover{color:#C6FF3D}
+
+/* Responsive */
+@media(max-width:600px){
+  .form-card{padding:28px 20px}
+  .engines-row{grid-template-columns:1fr}
+  .projected-scores{flex-direction:column;gap:8px}
+  .projected-arrow{transform:rotate(90deg)}
+  @keyframes arrowBounce{0%,100%{transform:rotate(90deg) translateX(0)}50%{transform:rotate(90deg) translateX(6px)}}
+  .cta-section .btn-cta-secondary{margin-left:0;margin-top:8px}
+}
+</style>
+</head>
+<body>
+
+<!-- Mini nav -->
+<div class="mini-nav">
+  <a href="https://mindscopekorea.com/geo.html" class="mini-brand">
+    <span class="mini-dot"></span>MindScope <small>GEO</small>
+  </a>
+  <a href="https://mindscope-geo-915005618960.us-central1.run.app/pricing" class="mini-nav-link">요금제 보기</a>
+</div>
+
+<!-- STEP 1: INPUT -->
+<div class="step step-input active" id="stepInput">
+  <div class="wrap" style="display:flex;flex-direction:column;align-items:center">
+    <h1 class="headline">AI가 당신의 브랜드를<br><span class="lime">추천하고 있을까요?</span></h1>
+    <p class="sub">ChatGPT, Gemini에서 브랜드가 어떻게 언급되고 있는지 무료로 진단합니다.</p>
+
+    <div class="form-card">
+      <div class="form-group">
+        <label class="form-label">브랜드명 <span class="req">*</span></label>
+        <input class="form-input" id="brandName" type="text" placeholder="예: 이니스프리" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">업종 / 키워드 <span class="req">*</span></label>
+        <input class="form-input" id="keywords" type="text" placeholder="예: 스킨케어, 화장품">
+        <div class="form-hint">쉼표(,)로 구분하여 입력하세요</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">경쟁사 <span class="opt">선택, 최대 3개</span></label>
+        <input class="form-input" id="competitors" type="text" placeholder="예: 라네즈, 미샤">
+        <div class="form-hint">쉼표(,)로 구분하여 입력하세요</div>
+      </div>
+      <button class="btn-diagnose" id="btnStart" onclick="startDiagnosis()">무료 진단 시작</button>
+      <div class="error-msg" id="errorMsg"></div>
+    </div>
+    <div class="form-footer">
+      약 30초 소요 <span>·</span> ChatGPT + Gemini 2개 엔진 분석 <span>·</span> 무료
+    </div>
+  </div>
+</div>
+
+<!-- STEP 2: LOADING -->
+<div class="step step-loading" id="stepLoading">
+  <div class="wrap" style="display:flex;flex-direction:column;align-items:center">
+    <div class="loading-spinner"></div>
+    <div class="loading-title">AI 엔진 분석 중...</div>
+    <div class="loading-steps" id="loadingSteps">
+      <div class="loading-step" data-idx="0">
+        <div class="icon"></div>
+        <span>ChatGPT에 질문 중...</span>
+      </div>
+      <div class="loading-step" data-idx="1">
+        <div class="icon"></div>
+        <span>Gemini에 질문 중...</span>
+      </div>
+      <div class="loading-step" data-idx="2">
+        <div class="icon"></div>
+        <span>브랜드 언급 분석 중...</span>
+      </div>
+      <div class="loading-step" data-idx="3">
+        <div class="icon"></div>
+        <span>경쟁사 비교 중...</span>
+      </div>
+      <div class="loading-step" data-idx="4">
+        <div class="icon"></div>
+        <span>점수 계산 중...</span>
+      </div>
+    </div>
+    <div class="loading-sub" id="loadingSub">잠시만 기다려 주세요. 실제 AI 엔진에 질문하고 있습니다.</div>
+  </div>
+</div>
+
+<!-- STEP 3: RESULTS -->
+<div class="step step-result" id="stepResult">
+  <div class="wrap" style="display:flex;flex-direction:column;align-items:center">
+
+    <div class="result-header">
+      <h2>AI 가시성 진단 결과</h2>
+      <div class="brand-name-display" id="resultBrand"></div>
+    </div>
+
+    <!-- Gauge -->
+    <div class="gauge-wrap">
+      <div class="gauge">
+        <svg viewBox="0 0 220 220">
+          <circle class="gauge-bg" cx="110" cy="110" r="96"/>
+          <circle class="gauge-fill" id="gaugeFill" cx="110" cy="110" r="96"
+            stroke-dasharray="603.19" stroke-dashoffset="603.19"/>
+        </svg>
+        <div class="gauge-center">
+          <div class="gauge-score" id="gaugeScore">0</div>
+          <div class="gauge-label">AI 가시성 점수</div>
+          <div class="gauge-grade" id="gaugeGrade"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Engine scores -->
+    <div class="engines-row" id="enginesRow"></div>
+
+    <!-- SOV -->
+    <div class="sov-section" id="sovSection" style="display:none">
+      <div class="sov-title">AI Share of Voice</div>
+      <div id="sovBars"></div>
+    </div>
+
+    <!-- Projected -->
+    <div class="projected" id="projectedSection">
+      <div class="projected-label">MindScope GEO 최적화 후 예상 점수</div>
+      <div class="projected-scores">
+        <div class="projected-current" id="projCurrent">0</div>
+        <div class="projected-arrow">&rarr;</div>
+        <div class="projected-future" id="projFuture">0</div>
+      </div>
+      <div class="projected-desc" id="projDesc"></div>
+    </div>
+
+    <!-- Improvements -->
+    <div class="improvements" id="improvements"></div>
+
+    <!-- CTA -->
+    <div class="cta-section">
+      <h3>AI 가시성, 지금 개선하세요</h3>
+      <p class="cta-sub">MindScope GEO가 AI 엔진에서 브랜드를 추천받을 수 있도록 최적화합니다.</p>
+      <div>
+        <a href="https://mindscope-geo-915005618960.us-central1.run.app/pricing" class="btn-cta-primary">전문 GEO 최적화 시작하기</a>
+        <a href="mailto:hesed@hesedhouse.net?subject=MindScope GEO 무료 상담 신청" class="btn-cta-secondary">무료 상담 신청</a>
+      </div>
+      <div class="cta-retry" onclick="resetForm()">다른 브랜드 진단하기</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function showStep(id){
+  document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function showError(msg){
+  var el=document.getElementById('errorMsg');
+  el.textContent=msg;el.style.display='block';
+  setTimeout(()=>{el.style.display='none'},5000);
+}
+
+function resetForm(){
+  document.getElementById('brandName').value='';
+  document.getElementById('keywords').value='';
+  document.getElementById('competitors').value='';
+  showStep('stepInput');
+}
+
+async function startDiagnosis(){
+  var brand=document.getElementById('brandName').value.trim();
+  var kwRaw=document.getElementById('keywords').value.trim();
+  var compRaw=document.getElementById('competitors').value.trim();
+
+  if(!brand){showError('브랜드명을 입력해주세요.');return;}
+  if(!kwRaw){showError('업종/키워드를 입력해주세요.');return;}
+
+  var keywords=kwRaw.split(/[,，]/).map(s=>s.trim()).filter(Boolean);
+  var competitors=compRaw?compRaw.split(/[,，]/).map(s=>s.trim()).filter(Boolean).slice(0,3):[];
+
+  // Disable button
+  var btn=document.getElementById('btnStart');
+  btn.disabled=true;btn.textContent='진단 준비 중...';
+
+  // Switch to loading
+  showStep('stepLoading');
+  var steps=document.querySelectorAll('.loading-step');
+  steps.forEach(s=>{s.classList.remove('active','done')});
+
+  // Animate loading steps in parallel with API call
+  var stepIdx=0;
+  var loadInterval=setInterval(function(){
+    if(stepIdx>0) steps[stepIdx-1].classList.remove('active'),steps[stepIdx-1].classList.add('done'),steps[stepIdx-1].querySelector('.icon').textContent='\u2713';
+    if(stepIdx<steps.length){steps[stepIdx].classList.add('active');steps[stepIdx].querySelector('.icon').textContent='\u25CF';}
+    stepIdx++;
+    if(stepIdx>steps.length) clearInterval(loadInterval);
+  },2000);
+
+  try{
+    var resp=await fetch('/api/diagnose',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({brand_name:brand,keywords:keywords,competitors:competitors})
+    });
+    if(!resp.ok){
+      var errData=await resp.json().catch(()=>({detail:'진단에 실패했습니다.'}));
+      throw new Error(errData.detail||'진단에 실패했습니다.');
+    }
+    var data=await resp.json();
+
+    // Finish all loading steps
+    clearInterval(loadInterval);
+    steps.forEach(s=>{s.classList.remove('active');s.classList.add('done');s.querySelector('.icon').textContent='\u2713'});
+
+    // Brief pause then show results
+    await new Promise(r=>setTimeout(r,800));
+    renderResults(data);
+    showStep('stepResult');
+  }catch(e){
+    clearInterval(loadInterval);
+    showStep('stepInput');
+    showError(e.message||'진단 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+  }finally{
+    btn.disabled=false;btn.textContent='무료 진단 시작';
+  }
+}
+
+function getScoreColor(score){
+  if(score<=30) return '#FF2D5F';
+  if(score<=60) return '#FFA500';
+  return '#C6FF3D';
+}
+
+function getGradeInfo(grade){
+  var map={
+    '매우 낮음':['grade-very-low','AI에서 브랜드가 아직 노출되지 않고 있습니다. 개선 여지가 매우 큽니다.'],
+    '낮음':['grade-low','AI 가시성이 낮은 상태입니다. 적극적인 최적화가 필요합니다.'],
+    '보통':['grade-medium','AI에서 간헐적으로 언급되고 있습니다. 추가 최적화로 크게 개선 가능합니다.'],
+    '높음':['grade-high','AI 가시성이 양호합니다. 정밀 최적화로 더 올릴 수 있습니다.'],
+    '매우 높음':['grade-very-high','AI에서 브랜드가 매우 잘 노출되고 있습니다.']
+  };
+  return map[grade]||['grade-low',''];
+}
+
+function animateCount(el,target,duration){
+  var start=0,startTime=null;
+  function step(ts){
+    if(!startTime) startTime=ts;
+    var p=Math.min((ts-startTime)/duration,1);
+    var eased=1-Math.pow(1-p,3);
+    el.textContent=Math.round(eased*target);
+    if(p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function renderResults(data){
+  // Brand name
+  document.getElementById('resultBrand').textContent=data.brand_name;
+
+  // Gauge
+  var score=data.overall_score;
+  var color=getScoreColor(score);
+  var fill=document.getElementById('gaugeFill');
+  var circ=2*Math.PI*96;
+  fill.style.stroke=color;
+  fill.setAttribute('stroke-dasharray',circ);
+  setTimeout(()=>{fill.setAttribute('stroke-dashoffset',circ-(circ*score/100))},100);
+  animateCount(document.getElementById('gaugeScore'),score,1500);
+
+  var gradeInfo=getGradeInfo(data.grade);
+  var gradeEl=document.getElementById('gaugeGrade');
+  gradeEl.textContent=data.grade;
+  gradeEl.className='gauge-grade '+gradeInfo[0];
+
+  // Engine cards
+  var enginesHtml='';
+  var engines=data.engine_scores||{};
+  for(var eng in engines){
+    var s=engines[eng];
+    var c=getScoreColor(s);
+    var label=eng==='chatgpt'?'ChatGPT':eng==='gemini'?'Gemini':eng;
+    enginesHtml+='<div class="engine-card"><div class="name">'+label+'</div>'
+      +'<div class="score" style="color:'+c+'">'+s+'<span style="font-size:16px;color:rgba(255,255,255,0.4)">점</span></div>'
+      +'<div class="engine-bar-wrap"><div class="engine-bar" style="width:0;background:'+c+'"></div></div></div>';
+  }
+  var engRow=document.getElementById('enginesRow');
+  engRow.innerHTML=enginesHtml;
+  setTimeout(()=>{
+    engRow.querySelectorAll('.engine-bar').forEach((bar,i)=>{
+      var engKeys=Object.keys(engines);
+      bar.style.width=engines[engKeys[i]]+'%';
+    });
+  },200);
+
+  // SOV
+  var sov=data.sov||{};
+  var sovKeys=Object.keys(sov);
+  if(sovKeys.length>1){
+    var sovSection=document.getElementById('sovSection');
+    sovSection.style.display='block';
+    var sovHtml='';
+    // Sort descending
+    sovKeys.sort((a,b)=>sov[b]-sov[a]);
+    for(var i=0;i<sovKeys.length;i++){
+      var n=sovKeys[i];
+      var pct=sov[n];
+      var isMine=n.toLowerCase()===data.brand_name.toLowerCase();
+      sovHtml+='<div class="sov-item"><div class="sov-meta"><span class="sov-name">'
+        +(isMine?'&#9733; ':'')+n+'</span><span class="sov-pct" style="color:'
+        +(isMine?'#C6FF3D':'rgba(255,255,255,0.6)')+'">'+pct+'%</span></div>'
+        +'<div class="sov-bar-wrap"><div class="sov-bar '+(isMine?'mine':'comp')+'" style="width:0" data-w="'+pct+'%"></div></div></div>';
+    }
+    document.getElementById('sovBars').innerHTML=sovHtml;
+    setTimeout(()=>{
+      document.querySelectorAll('.sov-bar').forEach(b=>{b.style.width=b.dataset.w});
+    },300);
+  }else{
+    document.getElementById('sovSection').style.display='none';
+  }
+
+  // Projected
+  var projScore=data.projected_score;
+  animateCount(document.getElementById('projCurrent'),score,1200);
+  animateCount(document.getElementById('projFuture'),projScore,1500);
+  document.getElementById('projDesc').textContent=
+    'MindScope GEO 최적화를 통해 AI 가시성을 '+score+'점에서 '+projScore+'점으로 향상시킬 수 있습니다.';
+
+  // Improvements
+  var imps=data.improvements||[];
+  var impHtml='';
+  for(var j=0;j<imps.length;j++){
+    impHtml+='<div class="improve-card"><div class="improve-icon">'+imps[j].icon+'</div><div><div class="improve-title">'+imps[j].title+'</div><div class="improve-desc">'+imps[j].desc+'</div></div></div>';
+  }
+  document.getElementById('improvements').innerHTML=impHtml;
+}
+</script>
+</body>
+</html>
